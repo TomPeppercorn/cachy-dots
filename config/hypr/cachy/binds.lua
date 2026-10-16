@@ -86,7 +86,9 @@ hl.bind("ALT + Print",         hl.dsp.exec_cmd(screenshot .. " window"))    -- S
 -- Session
 hl.bind(mod .. " + L",           hl.dsp.exec_cmd("loginctl lock-session"))  -- Lock screen
 hl.bind(mod .. " + SHIFT + R",   hl.dsp.exec_cmd("hyprctl reload"))  -- Reload Hyprland config
-hl.bind(mod .. " + SHIFT + M",   hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"))  -- Log out of Hyprland
+local logout = "command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"
+hl.bind(mod .. " + SHIFT + M",   hl.dsp.exec_cmd(logout))  -- Log out of Hyprland
+hl.bind("CTRL + ALT + Delete",   hl.dsp.exec_cmd(logout))  -- Log out of Hyprland
 
 -- Media / brightness keys
 hl.bind("XF86AudioRaiseVolume",  hl.dsp.exec_cmd("wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 5%+"), { locked = true, repeating = true })  -- Volume up

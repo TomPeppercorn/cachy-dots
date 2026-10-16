@@ -18,6 +18,9 @@ CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP="$CONFIG/cachy-dots/backups/$STAMP"
 CD="$CONFIG/cachy-dots"
+PICS="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")"
+WALLS="$PICS/Wallpapers"                                   # the pack goes here; Super+Shift+W lists it
+DEFAULT_WALLPAPER="gruvbox/dan-otis-OYFHT4X5isg.jpg"       # relative to the pack; change it any time with Super+Shift+W
 
 # ── defaults (overridable by flags) ──────────────────────────────
 EDITOR_PICK=""   # none | codium
@@ -176,6 +179,11 @@ if systemctl is-enabled --quiet display-manager.service 2>/dev/null; then
 fi
 NEED_LOGIN=0
 (( SETUP_LOGIN )) && [[ -z "$EXISTING_DM" ]] && NEED_LOGIN=1
+# Our SDDM from an earlier run (it left /etc/sddm.conf.d/10-cachy-dots.conf): keep its theme up to date
+MANAGE_LOGIN=$NEED_LOGIN
+(( SETUP_LOGIN )) && [[ "$EXISTING_DM" == sddm && -f /etc/sddm.conf.d/10-cachy-dots.conf ]] && MANAGE_LOGIN=1
+SILENT_VER=v1.5.1                                  # github.com/uiriansan/SilentSDDM release tag
+SILENT_DIR=/usr/share/sddm/themes/silent
 
 # ── questions ────────────────────────────────────────────────────
 step "A few picks"
@@ -183,7 +191,7 @@ step "A few picks"
 if [[ -t 0 ]] && (( ! ASSUME_YES && ! GROUPS_FROM_FLAGS )); then
     yesno "Install dev tools (git, docker, neovim, node, python, go…)?" y && WANT_DEV=1 || WANT_DEV=0
     yesno "Install CachyOS gaming packages (Steam, Lutris, Heroic, MangoHud, Proton)?" y && WANT_GAMING=1 || WANT_GAMING=0
-    yesno "Install everyday apps (Helium, Vesktop, mpv) and replace Firefox?" y && WANT_EVERYDAY=1 || WANT_EVERYDAY=0
+    yesno "Install everyday apps (Helium, Vesktop, Spotifast, mpv) and replace Firefox?" y && WANT_EVERYDAY=1 || WANT_EVERYDAY=0
     yesno "Install creative apps (Blender, FilmCraft video editor, LightCraft photo editor)?" y && WANT_CREATIVE=1 || WANT_CREATIVE=0
 fi
 if [[ -t 0 ]] && (( ! ASSUME_YES && REMOVE_GUI_TOOLS )); then
@@ -229,11 +237,13 @@ mapfile -t -O "${#PKGS[@]}" PKGS < <(read_list "$REPO/packages/base.txt")
 (( WANT_GAMING ))   && mapfile -t -O "${#PKGS[@]}" PKGS < <(read_list "$REPO/packages/gaming.txt")
 (( WANT_EVERYDAY )) && mapfile -t -O "${#PKGS[@]}" PKGS < <(read_list "$REPO/packages/everyday.txt")
 (( WANT_CREATIVE )) && mapfile -t -O "${#PKGS[@]}" PKGS < <(read_list "$REPO/packages/creative.txt")
-(( NEED_LOGIN ))    && PKGS+=(sddm qt6-svg qt6-virtualkeyboard qt6-multimedia-ffmpeg git)
+# SilentSDDM's README dependencies; qt6-imageformats lets the login screen show .webp wallpapers
+(( MANAGE_LOGIN ))  && PKGS+=(sddm qt6-svg qt6-virtualkeyboard qt6-multimedia-ffmpeg qt6-imageformats git)
 
 AUR+=(hyprmod)                                   # github.com/BlueManCZ/hyprmod README
 AUR+=(wlctl-bin pacsea-bin)                      # Wi-Fi + package TUIs: wlctl README; Pacsea README + its PKGBUILD-bin
 (( WANT_EVERYDAY )) && AUR+=(helium-browser-bin vesktop)   # AUR pages checked
+(( WANT_EVERYDAY )) && AUR+=(spotifast-bin)               # Spotify client: Spotifast README + its own AUR recipe
 case "$LAUNCHER" in
     vicinae) AUR+=(vicinae-bin) ;;              # docs.vicinae.com/install
     walker)  AUR+=(walker elephant elephant-desktopapplications elephant-files elephant-clipboard
@@ -264,10 +274,12 @@ printf '  Dev: %s   Gaming: %s   Everyday: %s   Creative: %s   Remove Firefox: %
     "$(yn $(( WANT_EVERYDAY && REMOVE_FIREFOX )))"
 printf '  System tools: wlctl (Wi-Fi), bluetui (Bluetooth), wiremix (sound), Pacsea (packages) · remove GUI ones: %s\n' \
     "$(yn "$REMOVE_GUI_TOOLS")"
-if [[ -n "$EXISTING_DM" ]]; then
+if (( MANAGE_LOGIN && ! NEED_LOGIN )); then
+    printf '  Login screen: SDDM from cachy-dots — switching it to the neutral SilentSDDM look\n'
+elif [[ -n "$EXISTING_DM" ]]; then
     printf '  Login screen: keeping %s\n' "$EXISTING_DM"
 elif (( NEED_LOGIN )); then
-    printf '  Login screen: none found — will set up SDDM with the astronaut theme\n'
+    printf '  Login screen: none found — will set up SDDM (SilentSDDM theme, shows your wallpaper)\n'
 else
     printf '  Login screen: none, and --no-login-screen given — start Hyprland with start-hyprland\n'
 fi
@@ -517,17 +529,18 @@ for t in "$REPO"/themes/*.json; do
     [[ -f "$t" ]] || continue
     run install -Dm644 "$t" "$CD/themes/$(basename "$t")"
 done
-for w in "$REPO"/wallpapers/*; do
-    [[ -f "$w" ]] || continue
-    run install -Dm644 "$w" "$CD/wallpapers/$(basename "$w")"
-done
-ok "Configs, scripts, themes and wallpapers in place"
+# Wallpaper pack → ~/Pictures/Wallpapers, keeping its folders. Existing files are never overwritten.
+run mkdir -p "$WALLS"
+run cp -r --update=none "$REPO/wallpapers/." "$WALLS/"
+ok "Configs, scripts, themes and $(find "$REPO/wallpapers" -type f | wc -l) wallpapers in place"
 
 # ── colors ───────────────────────────────────────────────────────
 step "Applying your theme"
 THEME_CMD="$HOME/.local/bin/cachy-theme"
-if [[ ! -e "$CD/wallpaper" ]]; then
-    run python3 "$THEME_CMD" wallpaper "$CD/wallpapers/gruvbox-hills.png"
+# Default wallpaper on a fresh install, or if you're still on the old generated default
+current_wall="$(readlink -f "$CD/wallpaper" 2>/dev/null || true)"
+if [[ -z "$current_wall" || ! -e "$current_wall" || "$current_wall" == "$CD/wallpapers/gruvbox-hills.png" ]]; then
+    run python3 "$THEME_CMD" wallpaper "$WALLS/$DEFAULT_WALLPAPER"
 fi
 if [[ ! -f "$CD/state.json" ]] || [[ "$THEME" != gruvbox-dark ]]; then
     # first install (or --theme given): set the starting theme without reloading anything
@@ -567,25 +580,50 @@ if [[ "$VIMRC" != none ]]; then
 fi
 
 # ── login screen ─────────────────────────────────────────────────
-if (( NEED_LOGIN )); then
-    step "Setting up the login screen (SDDM + astronaut theme)"
-    theme_dst=/usr/share/sddm/themes/sddm-astronaut-theme
-    tmp="$(mktemp -d)"
-    if run git clone -q --depth 1 https://github.com/Keyitdev/sddm-astronaut-theme.git "$tmp/theme"; then
-        run sudo rm -rf "$theme_dst"
-        run sudo mkdir -p "$theme_dst" /usr/share/fonts/sddm-astronaut-theme
-        (( DRY_RUN )) || sudo cp -r "$tmp/theme/." "$theme_dst/"
-        (( DRY_RUN )) || [[ ! -d "$tmp/theme/Fonts" ]] || sudo cp -r "$tmp/theme/Fonts/." /usr/share/fonts/sddm-astronaut-theme/
-        run sudo rm -rf "$theme_dst/.git"
-        run sudo install -Dm644 "$REPO/config/sddm/10-cachy-dots.conf" /etc/sddm.conf.d/10-cachy-dots.conf
-        ok "Astronaut theme installed — change its style any time with: cachy-login-theme"
+# Not owned by a package? (Then it's ours to replace or remove.)
+unowned() { [[ -e "$1" ]] && ! pacman -Qqo "$1" >/dev/null 2>&1; }
+
+if (( MANAGE_LOGIN )); then
+    step "Setting up the login screen (SDDM + SilentSDDM)"
+    if [[ -e "$SILENT_DIR" ]] && ! unowned "$SILENT_DIR"; then
+        ok "SilentSDDM is installed by a package — using that"
     else
-        warn "Couldn't download the SDDM theme; SDDM will use its default look."
+        tmp="$(mktemp -d)"
+        if run git clone -q --depth 1 --branch "$SILENT_VER" https://github.com/uiriansan/SilentSDDM.git "$tmp/theme"; then
+            run sudo rm -rf "$SILENT_DIR"
+            run sudo mkdir -p "$SILENT_DIR"
+            (( DRY_RUN )) || sudo cp -r "$tmp/theme/." "$SILENT_DIR/"
+            run sudo rm -rf "$SILENT_DIR/.git"
+            ok "SilentSDDM $SILENT_VER installed"
+        else
+            warn "Couldn't download SilentSDDM; SDDM will use its default look."
+        fi
+        rm -rf "$tmp"
     fi
-    rm -rf "$tmp"
+    # The astronaut theme from earlier versions of cachy-dots
+    for old in /usr/share/sddm/themes/sddm-astronaut-theme /usr/share/fonts/sddm-astronaut-theme; do
+        if unowned "$old"; then run sudo rm -rf "$old"; fi
+    done
+    if (( DRY_RUN )) || [[ -f "$SILENT_DIR/metadata.desktop" ]]; then
+        run sudo install -Dm644 "$REPO/config/sddm/10-cachy-dots.conf" /etc/sddm.conf.d/10-cachy-dots.conf
+        # Root helper + polkit rule so changing your wallpaper also updates the login screen
+        run sudo install -Dm755 "$REPO/system/cachy-login-wallpaper" /usr/local/libexec/cachy-login-wallpaper
+        run sudo install -Dm644 "$REPO/system/org.cachydots.loginwallpaper.policy" \
+            /usr/share/polkit-1/actions/org.cachydots.loginwallpaper.policy
+        login_wall="$(readlink -f "$CD/wallpaper" 2>/dev/null || true)"
+        if (( DRY_RUN )); then
+            run sudo /usr/local/libexec/cachy-login-wallpaper "< ${login_wall:-wallpaper}"
+        elif [[ -f "$login_wall" ]]; then
+            sudo /usr/local/libexec/cachy-login-wallpaper < "$login_wall" >/dev/null \
+                || warn "Couldn't put your wallpaper on the login screen; try: cachy-login-theme"
+        fi
+        ok "Login screen shows your wallpaper and follows it when you change it"
+    fi
     # enable only — starting it now would take over the console you're typing in
-    run sudo systemctl enable sddm.service
-    ok "Login screen enabled — it appears after a reboot"
+    if (( NEED_LOGIN )); then
+        run sudo systemctl enable sddm.service
+        ok "Login screen enabled — it appears after a reboot"
+    fi
 elif [[ -n "$EXISTING_DM" ]]; then
     ok "Login screen: kept $EXISTING_DM"
 fi
@@ -593,8 +631,7 @@ fi
 # ── system tweaks ────────────────────────────────────────────────
 step "Final touches"
 run xdg-user-dirs-update || true
-run mkdir -p "$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")/Screenshots" \
-             "$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")/Wallpapers"
+run mkdir -p "$PICS/Screenshots" "$WALLS"
 if command -v gsettings >/dev/null || (( DRY_RUN )); then
     run gsettings set org.gnome.desktop.interface font-name 'IBM Plex Sans 11' || true
     run gsettings set org.gnome.desktop.interface document-font-name 'IBM Plex Sans 11' || true

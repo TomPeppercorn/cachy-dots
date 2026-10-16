@@ -1,44 +1,38 @@
 #!/usr/bin/env bash
-# cachy-dots · change the SDDM login screen's style
+# cachy-dots · the SDDM login screen (SilentSDDM, neutral look)
 #
-# Lists the astronaut theme's styles, plus "Match my desktop", which copies your current
-# cachy-theme colors and wallpaper onto the login screen. Asks for your password (pkexec)
-# because the login screen's files live outside your home folder.
+#   cachy-login-theme        put your current wallpaper on the login screen now
+#   cachy-login-theme off    stop following your wallpaper (the login screen keeps its last image)
+#   cachy-login-theme on     follow your wallpaper again (the default)
+#
+# Changing your wallpaper (Super+Shift+W) already updates the login screen; this is for doing it
+# by hand, or turning that off.
 set -uo pipefail
 
-dir=/usr/share/sddm/themes/sddm-astronaut-theme
-meta="$dir/metadata.desktop"
-say() { notify-send -a "Login screen" "$1" "${2:-}" 2>/dev/null; echo "$1 ${2:-}"; }
+helper=/usr/local/libexec/cachy-login-wallpaper
+state="${XDG_CONFIG_HOME:-$HOME/.config}/cachy-dots/state.json"
+say() { notify-send -a "Login screen" "$1" "${2:-}" 2>/dev/null; echo "$1${2:+ — $2}"; }
 
-[[ -f "$meta" ]] || { say "The SDDM theme isn't installed" "Re-run the cachy-dots installer."; exit 1; }
+set_sync() {
+    [[ -f "$state" ]] || echo '{}' > "$state"
+    tmp="$(mktemp)" && jq --argjson v "$1" '.login_sync = $v' "$state" > "$tmp" && mv "$tmp" "$state"
+}
 
-mapfile -t styles < <(find "$dir/Themes" -name '*.conf' ! -name 'cachy.conf' -printf '%f\n' | sed 's/\.conf$//' | sort)
-match="Match my desktop (current theme + wallpaper)"
-choice="$( { echo "$match"; printf '%s\n' "${styles[@]}"; } | "$HOME/.local/bin/cachy-launcher" dmenu "Login screen style")"
-[[ -z "$choice" ]] && exit 0
+case "${1:-}" in
+    off) set_sync false; say "Login screen stays as it is" "Turn following back on with: cachy-login-theme on"; exit 0 ;;
+    on)  set_sync true ;;
+    "")  ;;
+    *)   echo "usage: cachy-login-theme [on|off]" >&2; exit 1 ;;
+esac
 
-if [[ "$choice" == "$match" ]]; then
-    pal="$HOME/.config/cachy-dots/palette.json"
-    wall="$(readlink -f "$HOME/.config/cachy-dots/wallpaper")"
-    [[ -f "$pal" && -f "$wall" ]] || { say "No theme or wallpaper set yet" "Run cachy-theme first."; exit 1; }
-    c() { jq -r ".$1" "$pal"; }
-    ext="${wall##*.}"
-    tmp="$(mktemp -d)"
-    sed -E \
-        -e "s|^Background=.*|Background=\"Backgrounds/cachy-wallpaper.$ext\"|" \
-        -e "s@^(HeaderTextColor|DateTextColor|TimeTextColor)=.*@\1=\"$(c fg)\"@" \
-        -e "s|^BackgroundColor=.*|BackgroundColor=\"$(c surface)\"|" \
-        -e "s|^LoginButtonBackgroundColor=.*|LoginButtonBackgroundColor=\"$(c accent)\"|" \
-        -e "s|^HighlightBackgroundColor=.*|HighlightBackgroundColor=\"$(c overlay)\"|" \
-        -e "s|^Font=.*|Font=\"IBM Plex Sans\"|" \
-        "$dir/Themes/astronaut.conf" > "$tmp/cachy.conf"
-    cp "$wall" "$tmp/wall.$ext"
-    pkexec /bin/sh -c "install -m644 '$tmp/cachy.conf' '$dir/Themes/cachy.conf' \
-        && install -m644 '$tmp/wall.$ext' '$dir/Backgrounds/cachy-wallpaper.$ext' \
-        && sed -i 's|^ConfigFile=.*|ConfigFile=Themes/cachy.conf|' '$meta'" \
-        && say "Login screen now matches your desktop" "You'll see it next time you log in."
-    rm -rf "$tmp"
+[[ -x "$helper" && -f /usr/share/sddm/themes/silent/metadata.desktop ]] \
+    || { say "The SDDM login theme isn't installed" "Re-run the cachy-dots installer."; exit 1; }
+wall="$(readlink -f "${XDG_CONFIG_HOME:-$HOME/.config}/cachy-dots/wallpaper" 2>/dev/null)"
+[[ -f "$wall" ]] || { say "No wallpaper set yet" "Pick one with Super+Shift+W."; exit 1; }
+
+if pkexec "$helper" < "$wall" >/dev/null; then
+    say "Login screen updated" "You'll see $(basename "$wall") next time you log in."
 else
-    pkexec sed -i "s|^ConfigFile=.*|ConfigFile=Themes/$choice.conf|" "$meta" \
-        && say "Login screen style: $choice" "You'll see it next time you log in."
+    say "Couldn't update the login screen" "Try: sudo $helper < '$wall'"
+    exit 1
 fi

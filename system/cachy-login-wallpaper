@@ -1,0 +1,88 @@
+#!/bin/bash
+# cachy-dots · put an image on the SDDM login screen (SilentSDDM theme).
+# Installed to /usr/local/libexec/cachy-login-wallpaper and run as root, through pkexec from
+# cachy-theme / cachy-login-theme, or through sudo from the installer.
+#
+#   cachy-login-wallpaper < image
+#
+# It only ever reads the image from stdin and never opens a path it's given, so it can't be used
+# to read files you couldn't read anyway. It accepts PNG, JPEG and WebP up to 64 MB, copies the
+# image into the theme's backgrounds/ folder, and writes the theme's override file (*.conf.user,
+# which SDDM merges over the theme's config) with the neutral look: your wallpaper, blurred and
+# dimmed, white text on frosted fields, IBM Plex Sans.
+set -euo pipefail
+PATH=/usr/bin:/bin
+umask 022
+
+theme=/usr/share/sddm/themes/silent
+max=$((64 * 1024 * 1024))
+
+die() { echo "cachy-login-wallpaper: $*" >&2; exit 1; }
+
+[[ -f "$theme/metadata.desktop" ]] || die "SilentSDDM isn't installed in $theme"
+
+# The override goes next to whichever config the theme is set to (configs/default.conf normally)
+conf="$(sed -n 's/^ConfigFile=//p' "$theme/metadata.desktop" | head -n1)"
+[[ "$conf" =~ ^configs/[A-Za-z0-9._-]+\.conf$ ]] || die "unexpected ConfigFile in metadata.desktop: '$conf'"
+
+tmp="$(mktemp)"
+trap 'rm -f "$tmp" "$tmp.conf"' EXIT
+head -c $((max + 1)) > "$tmp"
+size="$(stat -c %s "$tmp")"
+(( size > 0 ))    || die "no image on stdin"
+(( size <= max )) || die "image is larger than 64 MB"
+
+magic="$(head -c 12 "$tmp" | od -An -tx1 | tr -d ' \n')"
+case "$magic" in
+    89504e470d0a1a0a*)          ext=png ;;
+    ffd8ff*)                    ext=jpg ;;
+    52494646????????57454250)   ext=webp ;;   # "RIFF" + size + "WEBP"
+    *) die "not a PNG, JPEG or WebP image" ;;
+esac
+bg="cachy-wallpaper.$ext"
+
+cat > "$tmp.conf" <<EOF
+; cachy-dots · neutral look over your wallpaper. Written by cachy-login-wallpaper; changes here are
+; overwritten the next time your wallpaper changes. Keys: github.com/uiriansan/SilentSDDM/wiki/Customizing
+
+[LockScreen]
+background = "$bg"
+use-background-color = false
+blur = 24
+brightness = -0.1
+
+[LoginScreen]
+background = "$bg"
+use-background-color = false
+blur = 48
+brightness = -0.25
+
+[LockScreen.Clock]
+font-family = "IBM Plex Sans"
+[LockScreen.Date]
+font-family = "IBM Plex Sans"
+[LockScreen.Message]
+font-family = "IBM Plex Sans"
+[LoginScreen.LoginArea.Username]
+font-family = "IBM Plex Sans"
+[LoginScreen.LoginArea.PasswordInput]
+font-family = "IBM Plex Sans"
+[LoginScreen.LoginArea.LoginButton]
+font-family = "IBM Plex Sans"
+[LoginScreen.LoginArea.Spinner]
+font-family = "IBM Plex Sans"
+[LoginScreen.LoginArea.WarningMessage]
+font-family = "IBM Plex Sans"
+[LoginScreen.MenuArea.Buttons]
+font-family = "IBM Plex Sans"
+[LoginScreen.MenuArea.Popups]
+font-family = "IBM Plex Sans"
+[Tooltips]
+font-family = "IBM Plex Sans"
+EOF
+
+mkdir -p "$theme/backgrounds"
+rm -f "$theme"/backgrounds/cachy-wallpaper.*
+install -m644 "$tmp" "$theme/backgrounds/$bg"
+install -m644 "$tmp.conf" "$theme/$conf.user"
+echo "Login screen background updated ($ext, $((size / 1024)) KB)"

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+  "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!-- cachy-dots · lets whoever is logged in at the screen update the login-screen wallpaper
+     without a password. The helper only accepts an image on stdin (see cachy-login-wallpaper). -->
+<policyconfig>
+  <vendor>cachy-dots</vendor>
+  <action id="org.cachydots.loginwallpaper">
+    <description>Set the login screen wallpaper</description>
+    <message>Authentication is required to change the login screen wallpaper</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/libexec/cachy-login-wallpaper</annotate>
+  </action>
+</policyconfig>

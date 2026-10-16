@@ -25,14 +25,15 @@ Install CachyOS with only `hyprland` + `kitty` from the Hyprland group (no Nocta
 | Bar | **Quickshell**: workspaces, window title, clock, CPU %, RAM in use, download/upload speed, tray, network, Bluetooth, volume, battery, theme + notification buttons. The readouts open btop; network, Bluetooth and volume open their TUIs |
 | Themes | **cachy-theme**: 8 presets or colors generated from your wallpaper (matugen). One switch recolors everything |
 | Launcher | **Vicinae** or **Walker** (asked at install): apps, indexed file search, clipboard, calculator |
-| Login screen | **SDDM** + astronaut theme; `cachy-login-theme` switches its style or matches your desktop |
+| Login screen | **SDDM** + [SilentSDDM](https://github.com/uiriansan/SilentSDDM), neutral: your wallpaper blurred and dimmed, white text, frosted fields, IBM Plex Sans. It follows your wallpaper automatically, so it never clashes with a theme |
 | Terminal | kitty, IBM Plex (BlexMono Nerd Font) |
 | System tools | **Terminal apps in floating windows**: wlctl (Wi-Fi, Ethernet, VPN), bluetui (Bluetooth), wiremix (sound), Pacsea (packages, replaces Shelly), btop. Same toggle keys, same theme |
 | Notifications | swaync (themed) |
 | Lock / idle | hyprlock (Super+L), hypridle (lock 10 min, suspend 30 min) |
-| Browser · chat | Helium (Firefox removed) · Vesktop |
+| Browser · chat · music | Helium (Firefox removed) · Vesktop · [Spotifast](https://github.com/crmne/spotifast) (native Spotify client, needs Premium; follows your theme) |
 | Files | Thunar (Super+E), Yazi (Super+Shift+E) |
 | Screenshots | Print = instant, Super+Shift+S = annotate in Satty |
+| Wallpapers | A 24-image pack copied to `~/Pictures/Wallpapers` (in folders: `gruvbox/`, `cars/`, and loose ones). Default: `gruvbox/dan-otis-OYFHT4X5isg.jpg`, a foggy forest |
 | GPU | Detected and confirmed at install; NVIDIA desktop vs hybrid laptop handled differently |
 | Dev · Gaming | neovim, git, gh, lazygit, docker, node, python + uv, go, CLI tools; optional VSCodium; Vim upgraded with [amix/vimrc](https://github.com/amix/vimrc) (Awesome or Basic, asked at install) · CachyOS gaming meta-packages |
 | Creative | **Blender** (official repos), **FilmCraft** (video editing, color and sound; open-source Premiere Pro alternative), **LightCraft** (photo library and raw development; open-source Lightroom alternative). The two Craft apps come from the AUR `-bin` packages, or the project's checksum-verified release in `~/.local` if those aren't found |
@@ -43,10 +44,11 @@ Install CachyOS with only `hyprland` + `kitty` from the Hyprland group (no Nocta
 |---|---|
 | Switch theme | **Super+Shift+T** (or the palette icon in the bar), or `cachy-theme set nord` |
 | Colors from wallpaper | Pick "From wallpaper" in the picker, or `cachy-theme set wallpaper` |
-| Change wallpaper | **Super+Shift+W**, or `cachy-theme wallpaper ~/Pictures/x.jpg`. Drop images in `~/Pictures/Wallpapers` |
+| Change wallpaper | **Super+Shift+W**, or `cachy-theme wallpaper ~/Pictures/x.jpg`. Drop images (any subfolder) in `~/Pictures/Wallpapers`. The login screen follows |
 | Light wallpaper colors | `cachy-theme variant light` |
 | Make your own preset | Copy a file in `~/.config/cachy-dots/themes/`, edit the hex values; it appears in the picker |
-| Login screen to match | `cachy-login-theme` → "Match my desktop" |
+| Login screen | Follows your wallpaper by itself. `cachy-login-theme` refreshes it now; `cachy-login-theme off` / `on` stops / resumes following |
+| Spotifast colors | Settings → Theme → **cachy** (once); after that it recolors with everything else |
 
 Presets: Gruvbox Dark, Catppuccin Mocha, Catppuccin Latte (light), Tokyo Night, Nord, Rosé Pine, Everforest, Kanagawa.
 
@@ -95,6 +97,7 @@ Super + / shows every bind, including ones you add.
 | Shift + Print / Alt + Print | Screenshot monitor / window |
 | Super + L | Lock |
 | Super + Shift + R / M | Reload Hyprland / log out |
+| Ctrl + Alt + Delete | Log out |
 
 ## Make it yours
 
@@ -121,6 +124,8 @@ Re-running is safe. Packages use `--needed`, old configs go to `~/.config/cachy-
 - Needs Hyprland 0.55+ (Lua config). The bar sends Lua-style dispatches when you click a workspace.
 - **NVIDIA:** if the first animation after a pause stutters, that's the GPU waking from low clocks, a known driver behavior, not the config.
 - **Hybrid laptops:** the desktop runs on the integrated GPU. Use `prime-run %command%` in Steam launch options for games.
+- **Login wallpaper without a password:** a small root helper (`/usr/local/libexec/cachy-login-wallpaper`) plus a polkit rule let the logged-in user copy an image onto the login screen. The helper only accepts a PNG, JPEG or WebP on stdin (64 MB max) and writes two fixed files in the theme folder, so it can't be pointed at anything else.
+- **Wallpapers in a public repo** are public. Remove any you don't have the rights to share before pushing.
 - Vicinae sends anonymous system info once a day by default; turn it off in its settings (`telemetry`).
 - **FilmCraft / LightCraft from `~/.local`:** that's the fallback when the AUR packages aren't found. It's pinned to the release whose checksums were verified (0.8.0); re-run the installer after updating `STORYTOLD_VER` to move to a newer one. AUR installs update with the rest of the system.
 - **LightCraft on Wayland** runs through XWayland by default so drag-and-drop works; set `LIGHTCRAFT_WAYLAND=1` for native Wayland (sharper fractional scaling, no drop).
