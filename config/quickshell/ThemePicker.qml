@@ -116,6 +116,17 @@ PanelWindow {
                 }
             }
 
+            // Shown only if the theme list couldn't be loaded, instead of a silent empty panel
+            Text {
+                visible: picker.themes.length === 0
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: "Couldn't load the theme list. Run  cachy-theme list  in a terminal to see why, or check  qs log."
+                color: Theme.red
+                font.family: Theme.uiFont
+                font.pixelSize: 12
+            }
+
             GridLayout {
                 Layout.fillWidth: true
                 columns: 3
