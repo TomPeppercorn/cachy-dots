@@ -30,9 +30,10 @@ Install CachyOS with only `hyprland` + `kitty` from the Hyprland group (no Nocta
 | System tools | **Terminal apps in floating windows**: wlctl (Wi-Fi, Ethernet, VPN), bluetui (Bluetooth), wiremix (sound), Pacsea (packages, replaces Shelly), btop. Same toggle keys, same theme |
 | Notifications | swaync (themed) |
 | Lock / idle | hyprlock (Super+L), hypridle (lock 10 min, suspend 30 min) |
-| Browser · chat · music | Helium (Firefox removed) · Vesktop · [Spotifast](https://github.com/crmne/spotifast) (native Spotify client, needs Premium; follows your theme) |
+| Browser · chat · music · notes | Helium (Firefox removed) · Vesktop · [Spotifast](https://github.com/crmne/spotifast) (native Spotify client, needs Premium; follows your theme) · Obsidian |
 | Files | Thunar (Super+E), Yazi (Super+Shift+E) |
 | Screenshots | Print = instant, Super+Shift+S = annotate in Satty |
+| Screen recording | **GPU Screen Recorder** with its ShadowPlay-style overlay (Left Alt+Z or Super+Alt+O): record, pause, stream, instant replay. Encodes on the GPU, so it barely touches performance |
 | Wallpapers | A 24-image pack copied to `~/Pictures/Wallpapers` (in folders: `gruvbox/`, `cars/`, and loose ones). Default: `gruvbox/dan-otis-OYFHT4X5isg.jpg`, a foggy forest |
 | GPU | Detected and confirmed at install; NVIDIA desktop vs hybrid laptop handled differently |
 | Dev · Gaming | neovim, git, gh, lazygit, docker, node, python + uv, go, CLI tools; optional VSCodium; Vim upgraded with [amix/vimrc](https://github.com/amix/vimrc) (Awesome or Basic, asked at install) · CachyOS gaming meta-packages |
@@ -95,6 +96,8 @@ Super + / shows every bind, including ones you add.
 | Ctrl + Shift + Esc | Task manager (btop) |
 | Print / Super + Shift + S | Screenshot region / region + annotate |
 | Shift + Print / Alt + Print | Screenshot monitor / window |
+| Super + Alt + O (or Left Alt + Z) | Screen recorder overlay |
+| Super + Alt + R / C | Start/stop recording / save a replay clip (Replay on) |
 | Super + L | Lock |
 | Super + Shift + R / M | Reload Hyprland / log out |
 | Ctrl + Alt + Delete | Log out |
@@ -125,6 +128,7 @@ Re-running is safe. Packages use `--needed`, old configs go to `~/.config/cachy-
 - **NVIDIA:** if the first animation after a pause stutters, that's the GPU waking from low clocks, a known driver behavior, not the config.
 - **Hybrid laptops:** the desktop runs on the integrated GPU. Use `prime-run %command%` in Steam launch options for games.
 - **Login wallpaper without a password:** a small root helper (`/usr/local/libexec/cachy-login-wallpaper`) plus a polkit rule let the logged-in user copy an image onto the login screen. The helper only accepts a PNG, JPEG or WebP on stdin (64 MB max) and writes two fixed files in the theme folder, so it can't be pointed at anything else.
+- **Screen recorder overlay:** it catches its own hotkeys by grabbing the keyboards (it adds a "gsr-ui virtual keyboard"), which can clash with key-remapping tools; its settings have "Only grab virtual devices" for that, and the Super+Alt binds keep working. Locked out of the keyboard? Left Ctrl+Shift+Alt+Esc closes it. The project lists two Hyprland quirks: the wallpaper can show instead of a game while the overlay is open, and opening it over a fullscreen game can upset that window. Recording itself is unaffected; use Super+Alt+R in games if it bothers you.
 - **Wallpapers in a public repo** are public. Remove any you don't have the rights to share before pushing.
 - Vicinae sends anonymous system info once a day by default; turn it off in its settings (`telemetry`).
 - **FilmCraft / LightCraft from `~/.local`:** that's the fallback when the AUR packages aren't found. It's pinned to the release whose checksums were verified (0.8.0); re-run the installer after updating `STORYTOLD_VER` to move to a newer one. AUR installs update with the rest of the system.

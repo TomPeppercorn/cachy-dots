@@ -66,7 +66,7 @@ Options:
   --theme NAME      starting color theme, e.g. gruvbox-dark, catppuccin-mocha, nord, wallpaper
   --no-dev          skip dev tools
   --no-gaming       skip CachyOS gaming packages
-  --no-everyday     skip Helium / Vesktop / media apps
+  --no-everyday     skip Helium / Vesktop / Spotifast / Obsidian / media apps
   --no-creative     skip Blender / FilmCraft / LightCraft
   --keep-firefox    don't uninstall Firefox
   --keep-gui-tools  don't remove Shelly / pavucontrol / Blueman / nm-applet (the TUIs replace them)
@@ -191,7 +191,7 @@ step "A few picks"
 if [[ -t 0 ]] && (( ! ASSUME_YES && ! GROUPS_FROM_FLAGS )); then
     yesno "Install dev tools (git, docker, neovim, node, python, go…)?" y && WANT_DEV=1 || WANT_DEV=0
     yesno "Install CachyOS gaming packages (Steam, Lutris, Heroic, MangoHud, Proton)?" y && WANT_GAMING=1 || WANT_GAMING=0
-    yesno "Install everyday apps (Helium, Vesktop, Spotifast, mpv) and replace Firefox?" y && WANT_EVERYDAY=1 || WANT_EVERYDAY=0
+    yesno "Install everyday apps (Helium, Vesktop, Spotifast, Obsidian, mpv) and replace Firefox?" y && WANT_EVERYDAY=1 || WANT_EVERYDAY=0
     yesno "Install creative apps (Blender, FilmCraft video editor, LightCraft photo editor)?" y && WANT_CREATIVE=1 || WANT_CREATIVE=0
 fi
 if [[ -t 0 ]] && (( ! ASSUME_YES && REMOVE_GUI_TOOLS )); then
@@ -241,6 +241,7 @@ mapfile -t -O "${#PKGS[@]}" PKGS < <(read_list "$REPO/packages/base.txt")
 (( MANAGE_LOGIN ))  && PKGS+=(sddm qt6-svg qt6-virtualkeyboard qt6-multimedia-ffmpeg qt6-imageformats git)
 
 AUR+=(hyprmod)                                   # github.com/BlueManCZ/hyprmod README
+AUR+=(gpu-screen-recorder-ui)                    # recorder overlay: its README (git.dec05eba.com/gpu-screen-recorder-ui)
 AUR+=(wlctl-bin pacsea-bin)                      # Wi-Fi + package TUIs: wlctl README; Pacsea README + its PKGBUILD-bin
 (( WANT_EVERYDAY )) && AUR+=(helium-browser-bin vesktop)   # AUR pages checked
 (( WANT_EVERYDAY )) && AUR+=(spotifast-bin)               # Spotify client: Spotifast README + its own AUR recipe

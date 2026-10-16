@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# cachy-dots · screen recording through GPU Screen Recorder's overlay (gsr-ui)
+#
+#   cachy-record overlay   show / hide the overlay        Super+Alt+O  (gsr-ui's own key: Left Alt+Z)
+#   cachy-record toggle    start / stop recording         Super+Alt+R
+#   cachy-record pause     pause / resume the recording
+#   cachy-record clip      save the last few minutes      Super+Alt+C  (turn Replay on in the overlay first)
+#
+# The overlay starts with Hyprland (autostart.lua); if it isn't running, this starts it first.
+# Where videos go, quality, audio and its own hotkeys are set in the overlay's settings.
+set -uo pipefail
+
+case "${1:-}" in
+    overlay) action=toggle-show ;;
+    toggle)  action=toggle-record ;;
+    pause)   action=toggle-pause ;;
+    clip)    action=replay-save ;;
+    *) echo "usage: cachy-record overlay|toggle|pause|clip" >&2; exit 1 ;;
+esac
+
+if ! command -v gsr-ui-cli >/dev/null; then
+    notify-send -a cachy-record "Screen recorder isn't installed" \
+        "Re-run the cachy-dots installer, or: paru -S gpu-screen-recorder-ui" 2>/dev/null
+    exit 1
+fi
+
+if ! pgrep -x gsr-ui >/dev/null; then
+    setsid -f gsr-ui >/dev/null 2>&1
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        sleep 0.3
+        pgrep -x gsr-ui >/dev/null && break
+    done
+    sleep 0.5   # give it a moment to start listening
+fi
+
+exec gsr-ui-cli "$action"

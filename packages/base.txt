@@ -58,6 +58,9 @@ grim
 slurp
 satty
 
+# Screen recording: GPU Screen Recorder (official repos); its overlay, gpu-screen-recorder-ui, is from the AUR
+gpu-screen-recorder
+
 # Theme manager (cachy-theme): wallpaper-based colors + its runtime
 matugen
 python

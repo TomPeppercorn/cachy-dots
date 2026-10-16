@@ -11,4 +11,5 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("~/.local/bin/cachy-launcher daemon")         -- Vicinae or Walker in the background
     hl.exec_cmd("hypridle")
     hl.exec_cmd("systemctl --user start hyprpolkitagent")
+    hl.exec_cmd("command -v gsr-ui >/dev/null && gsr-ui")    -- screen recorder overlay (Left Alt + Z)
 end)

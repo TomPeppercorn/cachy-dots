@@ -83,6 +83,12 @@ hl.bind(mod .. " + SHIFT + S", hl.dsp.exec_cmd(screenshot .. " annotate"))  -- S
 hl.bind("SHIFT + Print",       hl.dsp.exec_cmd(screenshot .. " screen"))    -- Screenshot monitor
 hl.bind("ALT + Print",         hl.dsp.exec_cmd(screenshot .. " window"))    -- Screenshot window
 
+-- Screen recording: GPU Screen Recorder's overlay (its own key, Left Alt + Z, works too)
+local record = "~/.local/bin/cachy-record"
+hl.bind(mod .. " + ALT + O", hl.dsp.exec_cmd(record .. " overlay"))  -- Screen recorder overlay
+hl.bind(mod .. " + ALT + R", hl.dsp.exec_cmd(record .. " toggle"))   -- Start / stop screen recording
+hl.bind(mod .. " + ALT + C", hl.dsp.exec_cmd(record .. " clip"))     -- Save a replay clip (Replay on)
+
 -- Session
 hl.bind(mod .. " + L",           hl.dsp.exec_cmd("loginctl lock-session"))  -- Lock screen
 hl.bind(mod .. " + SHIFT + R",   hl.dsp.exec_cmd("hyprctl reload"))  -- Reload Hyprland config
