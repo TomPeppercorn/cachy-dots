@@ -11,6 +11,13 @@ hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "auto" 
 -------------------------------
 ---- ENVIRONMENT VARIABLES ----
 -------------------------------
+-- Programs launched by Hyprland (keybinds, the bar, autostart) need to find the cachy-* scripts.
+-- A session started from SDDM doesn't include ~/.local/bin in PATH, so add it — once, even across reloads.
+local home, path = os.getenv("HOME") or "", os.getenv("PATH") or "/usr/local/bin:/usr/bin"
+if not path:find(home .. "/.local/bin", 1, true) then
+    hl.env("PATH", home .. "/.local/bin:" .. path)
+end
+
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 hl.env("ELECTRON_OZONE_PLATFORM_HINT", "auto") -- Vesktop / VSCodium on native Wayland

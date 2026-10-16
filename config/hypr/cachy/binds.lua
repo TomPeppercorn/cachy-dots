@@ -27,7 +27,7 @@ hl.bind(mod .. " + Space",  hl.dsp.exec_cmd(launcher))  -- Launcher: apps, files
 hl.bind(mod .. " + V",      hl.dsp.exec_cmd(launcher .. " clipboard"))  -- Clipboard history
 hl.bind(mod .. " + SHIFT + F", hl.dsp.exec_cmd(launcher .. " files"))  -- File search
 hl.bind(mod .. " + SHIFT + T", hl.dsp.exec_cmd("qs ipc call theme toggle"))  -- Theme picker
-hl.bind(mod .. " + SHIFT + W", hl.dsp.exec_cmd("cachy-theme pick-wallpaper"))  -- Change wallpaper
+hl.bind(mod .. " + SHIFT + W", hl.dsp.exec_cmd("~/.local/bin/cachy-theme pick-wallpaper"))  -- Change wallpaper
 hl.bind(mod .. " + comma",  hl.dsp.exec_cmd("hyprmod"))  -- Hyprland settings (HyprMod)
 hl.bind(mod .. " + N",      hl.dsp.exec_cmd("swaync-client -t -sw"))  -- Notification center
 hl.bind(mod .. " + slash",  hl.dsp.exec_cmd("~/.local/bin/cachy-keybinds"))  -- This cheatsheet

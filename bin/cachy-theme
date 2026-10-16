@@ -195,7 +195,7 @@ def matugen_palette(image: Path, variant: str):
 def r_quickshell(p):
     q = {k: p[k] for k in ("name", "variant", "bg", "surface", "overlay", "border", "fg", "muted",
                            "accent", "accent2", "red", "green", "yellow", "blue", "magenta", "cyan", "orange")}
-    q["onAccent"] = readable_on(p["accent"], p["bg"], p["fg"])
+    q["accentFg"] = readable_on(p["accent"], p["bg"], p["fg"])
     write(CD / "palette.json", json.dumps(q, indent=2, ensure_ascii=False) + "\n")
 
 

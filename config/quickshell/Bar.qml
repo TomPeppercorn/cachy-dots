@@ -89,7 +89,7 @@ PanelWindow {
                         Text {
                             anchors.centerIn: parent
                             text: wsButton.wsId === 10 ? "0" : wsButton.wsId
-                            color: wsButton.isFocused ? Theme.onAccent : Theme.fg
+                            color: wsButton.isFocused ? Theme.accentFg : Theme.fg
                             font.family: Theme.font
                             font.pixelSize: 10
                             font.bold: wsButton.isFocused

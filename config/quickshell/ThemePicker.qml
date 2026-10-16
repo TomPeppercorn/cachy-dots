@@ -36,6 +36,7 @@ PanelWindow {
     WlrLayershell.namespace: "cachy-theme-picker"
 
     property var themes: []
+    readonly property string themeCmd: Quickshell.env("HOME") + "/.local/bin/cachy-theme"
 
     onVisibleChanged: {
         if (visible) {
@@ -45,13 +46,13 @@ PanelWindow {
     }
 
     function choose(id) {
-        Quickshell.execDetached(["cachy-theme", "set", id]);
+        Quickshell.execDetached([picker.themeCmd, "set", id]);
         Ui.themePickerOpen = false;
     }
 
     Process {
         id: listThemes
-        command: ["cachy-theme", "list", "--json"]
+        command: [picker.themeCmd, "list", "--json"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
@@ -209,7 +210,7 @@ PanelWindow {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                         Ui.themePickerOpen = false;
-                        Quickshell.execDetached(["cachy-theme", "pick-wallpaper"]);
+                        Quickshell.execDetached([picker.themeCmd, "pick-wallpaper"]);
                     }
                 }
             }

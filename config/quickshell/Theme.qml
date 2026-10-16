@@ -1,6 +1,8 @@
 pragma Singleton
 
-// cachy-dots · live palette. `cachy-theme` writes ~/.config/cachy-dots/palette.json;
+// cachy-dots · live palette.
+// (Property names must not start with "on" + a capital letter: QML reads those as signal handlers.)
+// `cachy-theme` writes ~/.config/cachy-dots/palette.json;
 // this file watches it, so switching themes recolors the bar instantly.
 // The defaults below (Gruvbox) only show until the file is read.
 import Quickshell
@@ -11,7 +13,6 @@ Singleton {
     id: root
 
     readonly property string name:     pal.name
-    readonly property string variant:  pal.variant
     readonly property color bg:        pal.bg
     readonly property color surface:   pal.surface
     readonly property color overlay:   pal.overlay
@@ -20,7 +21,7 @@ Singleton {
     readonly property color muted:     pal.muted
     readonly property color accent:    pal.accent
     readonly property color accent2:   pal.accent2
-    readonly property color onAccent:  pal.onAccent
+    readonly property color accentFg:  pal.accentFg   // text drawn on top of the accent color
     readonly property color red:       pal.red
     readonly property color green:     pal.green
     readonly property color yellow:    pal.yellow
@@ -43,7 +44,6 @@ Singleton {
         JsonAdapter {
             id: pal
             property string name:     "Gruvbox Dark"
-            property string variant:  "dark"
             property string bg:       "#1d2021"
             property string surface:  "#282828"
             property string overlay:  "#3c3836"
@@ -52,7 +52,7 @@ Singleton {
             property string muted:    "#928374"
             property string accent:   "#fabd2f"
             property string accent2:  "#fe8019"
-            property string onAccent: "#1d2021"
+            property string accentFg: "#1d2021"
             property string red:      "#fb4934"
             property string green:    "#b8bb26"
             property string yellow:   "#fabd2f"
