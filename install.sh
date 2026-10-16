@@ -28,6 +28,7 @@ THEME="gruvbox-dark"
 WANT_DEV=1
 WANT_GAMING=1
 WANT_EVERYDAY=1
+WANT_CREATIVE=1
 GROUPS_FROM_FLAGS=0
 REMOVE_FIREFOX=1
 REMOVE_GUI_TOOLS=1   # Shelly, pavucontrol, Blueman, nm-applet → replaced by TUIs
@@ -63,6 +64,7 @@ Options:
   --no-dev          skip dev tools
   --no-gaming       skip CachyOS gaming packages
   --no-everyday     skip Helium / Vesktop / media apps
+  --no-creative     skip Blender / FilmCraft / LightCraft
   --keep-firefox    don't uninstall Firefox
   --keep-gui-tools  don't remove Shelly / pavucontrol / Blueman / nm-applet (the TUIs replace them)
   --no-login-screen don't set up SDDM even if no login screen is enabled
@@ -82,6 +84,7 @@ while (( $# )); do
         --no-dev)          WANT_DEV=0; GROUPS_FROM_FLAGS=1 ;;
         --no-gaming)       WANT_GAMING=0; GROUPS_FROM_FLAGS=1 ;;
         --no-everyday)     WANT_EVERYDAY=0; GROUPS_FROM_FLAGS=1 ;;
+        --no-creative)     WANT_CREATIVE=0; GROUPS_FROM_FLAGS=1 ;;
         --keep-firefox)    REMOVE_FIREFOX=0 ;;
         --keep-gui-tools)  REMOVE_GUI_TOOLS=0 ;;
         --no-login-screen) SETUP_LOGIN=0 ;;
@@ -181,6 +184,7 @@ if [[ -t 0 ]] && (( ! ASSUME_YES && ! GROUPS_FROM_FLAGS )); then
     yesno "Install dev tools (git, docker, neovim, node, python, go…)?" y && WANT_DEV=1 || WANT_DEV=0
     yesno "Install CachyOS gaming packages (Steam, Lutris, Heroic, MangoHud, Proton)?" y && WANT_GAMING=1 || WANT_GAMING=0
     yesno "Install everyday apps (Helium, Vesktop, mpv) and replace Firefox?" y && WANT_EVERYDAY=1 || WANT_EVERYDAY=0
+    yesno "Install creative apps (Blender, FilmCraft video editor, LightCraft photo editor)?" y && WANT_CREATIVE=1 || WANT_CREATIVE=0
 fi
 if [[ -t 0 ]] && (( ! ASSUME_YES && REMOVE_GUI_TOOLS )); then
     yesno "Remove the GUI tools the terminal apps replace (Shelly, pavucontrol, Blueman, network applet)?" y \
@@ -224,6 +228,7 @@ mapfile -t -O "${#PKGS[@]}" PKGS < <(read_list "$REPO/packages/base.txt")
 (( WANT_DEV ))      && mapfile -t -O "${#PKGS[@]}" PKGS < <(read_list "$REPO/packages/dev.txt")
 (( WANT_GAMING ))   && mapfile -t -O "${#PKGS[@]}" PKGS < <(read_list "$REPO/packages/gaming.txt")
 (( WANT_EVERYDAY )) && mapfile -t -O "${#PKGS[@]}" PKGS < <(read_list "$REPO/packages/everyday.txt")
+(( WANT_CREATIVE )) && mapfile -t -O "${#PKGS[@]}" PKGS < <(read_list "$REPO/packages/creative.txt")
 (( NEED_LOGIN ))    && PKGS+=(sddm qt6-svg qt6-virtualkeyboard qt6-multimedia-ffmpeg git)
 
 AUR+=(hyprmod)                                   # github.com/BlueManCZ/hyprmod README
@@ -254,8 +259,9 @@ yn() { (( $1 )) && echo yes || echo no; }
 step "Plan"
 printf '  Launcher: %s   GPU: %s   Theme: %s   Editor: neovim%s   Vim: %s\n' "$LAUNCHER" "$GPU" "$THEME" \
     "$([[ $EDITOR_PICK != none ]] && echo " + $EDITOR_PICK")" "$([[ $VIMRC != none ]] && echo "amix/vimrc ($VIMRC)" || echo unchanged)"
-printf '  Dev: %s   Gaming: %s   Everyday: %s   Remove Firefox: %s\n' \
-    "$(yn "$WANT_DEV")" "$(yn "$WANT_GAMING")" "$(yn "$WANT_EVERYDAY")" "$(yn $(( WANT_EVERYDAY && REMOVE_FIREFOX )))"
+printf '  Dev: %s   Gaming: %s   Everyday: %s   Creative: %s   Remove Firefox: %s\n' \
+    "$(yn "$WANT_DEV")" "$(yn "$WANT_GAMING")" "$(yn "$WANT_EVERYDAY")" "$(yn "$WANT_CREATIVE")" \
+    "$(yn $(( WANT_EVERYDAY && REMOVE_FIREFOX )))"
 printf '  System tools: wlctl (Wi-Fi), bluetui (Bluetooth), wiremix (sound), Pacsea (packages) · remove GUI ones: %s\n' \
     "$(yn "$REMOVE_GUI_TOOLS")"
 if [[ -n "$EXISTING_DM" ]]; then
@@ -327,6 +333,67 @@ if (( REMOVE_GUI_TOOLS )); then
         else
             why="$(printf '%s' "$out" | grep -m1 -iE 'required by' || printf '%s' "$out" | grep -m1 -i 'error' || echo 'pacman refused to remove it')"
             warn "Kept $gui (${why#:: })"
+        fi
+    done
+fi
+
+# ── creative apps ────────────────────────────────────────────────
+# Blender comes from the official repos (packages/creative.txt). FilmCraft and LightCraft
+# (github.com/storytold) install from the AUR -bin packages when they exist, so they update with
+# the rest of the system. Otherwise: the project's own release tarball, checked against its
+# published SHA256SUMS.txt and installed into ~/.local, the same way FilmCraft's install.sh does it.
+STORYTOLD_VER=0.8.0   # tarball fallback only; checksums verified for this release
+
+install_storytold_tarball() { # app
+    local app="$1" ver="$STORYTOLD_VER" base="https://github.com/storytold/$1/releases/download/v$STORYTOLD_VER"
+    local file="$app-$ver-linux-x86_64.tar.gz" tmp want got prefix="$HOME/.local"
+    if (( DRY_RUN )); then
+        printf '  %s[dry-run]%s download %s, check it against SHA256SUMS.txt, install into ~/.local\n' "$c_dim" "$c_0" "$file"
+        return 0
+    fi
+    tmp="$(mktemp -d)"
+    if ! curl -fsSL -o "$tmp/$file" "$base/$file" || ! curl -fsSL -o "$tmp/SHA256SUMS.txt" "$base/SHA256SUMS.txt"; then
+        warn "Couldn't download $app $ver — skipped"; rm -rf "$tmp"; return 1
+    fi
+    want="$(awk -v f="$file" '$2 == f {print $1}' "$tmp/SHA256SUMS.txt")"
+    got="$(sha256sum "$tmp/$file" | cut -d' ' -f1)"
+    if [[ -z "$want" || "$want" != "$got" ]]; then
+        warn "$app download didn't match its published checksum — not installed"; rm -rf "$tmp"; return 1
+    fi
+    tar -xzf "$tmp/$file" -C "$tmp"
+    local src="$tmp/$app-$ver-linux-x86_64"
+    mkdir -p "$prefix/bin" "$prefix/share"
+    install -m755 "$src/bin/$app" "$prefix/bin/$app"
+    install -m755 "$src/bin/$app-cli" "$prefix/bin/$app-cli"
+    cp -R "$src/share/." "$prefix/share/"
+    # Absolute Exec path so the app menu doesn't depend on PATH (as upstream's install.sh does)
+    sed -i -e "s|^Exec=$app |Exec=\"$prefix/bin/$app\" |" -e "s|^TryExec=.*|TryExec=$prefix/bin/$app|" \
+        "$prefix/share/applications/ai.storyteller.$app.desktop"
+    command -v update-desktop-database >/dev/null && update-desktop-database -q "$prefix/share/applications" || true
+    command -v update-mime-database >/dev/null && update-mime-database "$prefix/share/mime" >/dev/null 2>&1 || true
+    rm -rf "$tmp"
+    ok "Installed $app $ver into ~/.local (checksum verified). Re-run this installer to update it."
+}
+
+if (( WANT_CREATIVE )); then
+    step "Creative apps: Blender, FilmCraft, LightCraft"
+    for app in filmcraft lightcraft; do
+        if pacman -Q "$app-bin" >/dev/null 2>&1; then
+            ok "$app-bin already installed"
+        elif (( ! DRY_RUN )) && paru -Si "$app-bin" >/dev/null 2>&1; then
+            if run paru -S "${PARU_FLAGS[@]}" "$app-bin"; then
+                ok "Installed $app-bin (AUR, updates with your system)"
+                # drop an earlier ~/.local fallback copy so there's only one
+                rm -f "$HOME/.local/bin/$app" "$HOME/.local/bin/$app-cli" \
+                      "$HOME/.local/share/applications/ai.storyteller.$app.desktop"
+            else
+                warn "$app-bin failed to install — trying the official release instead"
+                install_storytold_tarball "$app" || true
+            fi
+        else
+            (( DRY_RUN )) && printf '  %s[dry-run]%s paru -S %s   (if it exists in the AUR, else:)\n' "$c_dim" "$c_0" "$app-bin" \
+                          || warn "AUR package '$app-bin' wasn't found — installing the official release instead"
+            install_storytold_tarball "$app" || true
         fi
     done
 fi

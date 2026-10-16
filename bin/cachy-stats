@@ -1,0 +1,20 @@
+#!/bin/sh
+# cachy-dots · system stats for the bar (CPU, RAM, network throughput)
+#
+# Prints one line every 2 seconds, read by ~/.config/quickshell/Stats.qml:
+#   cpu <user> <nice> <system> <idle> <iowait> <irq> <softirq> <steal> mem <totalKiB> <availableKiB> net <rxBytes> <txBytes>
+# Straight from the kernel's counters (/proc), no extra tools. The bar turns them into % and speeds.
+# Network totals skip loopback and virtual links (Docker, bridges, VPN tunnels) so traffic isn't counted twice.
+while :; do
+  awk '
+    FILENAME == "/proc/stat"    && $1 == "cpu"          { printf "cpu"; for (i = 2; i <= 9; i++) printf " %s", $i }
+    FILENAME == "/proc/meminfo" && $1 == "MemTotal:"     { mt = $2 }
+    FILENAME == "/proc/meminfo" && $1 == "MemAvailable:" { ma = $2 }
+    FILENAME == "/proc/net/dev" && FNR > 2 {
+      sub(/^ +/, ""); split($0, a, /[: ]+/)
+      if (a[1] !~ /^(lo|docker|veth|br-|virbr|tun|tap|wg)/) { rx += a[2]; tx += a[10] }
+    }
+    END { printf " mem %.0f %.0f net %.0f %.0f\n", mt, ma, rx, tx }
+  ' /proc/stat /proc/meminfo /proc/net/dev
+  sleep 2
+done

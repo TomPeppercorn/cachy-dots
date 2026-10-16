@@ -22,7 +22,7 @@ Install CachyOS with only `hyprland` + `kitty` from the Hyprland group (no Nocta
 |---|---|
 | Compositor | Hyprland, **Lua config** (0.55+), snappy ~250 ms animations |
 | Settings app | **HyprMod** (Super+,): change Hyprland settings, binds, curves in a GUI |
-| Bar | **Quickshell**: workspaces, window title, clock, tray, network, Bluetooth, volume, battery, theme + notification buttons. Network, Bluetooth and volume open their TUIs |
+| Bar | **Quickshell**: workspaces, window title, clock, CPU %, RAM in use, download/upload speed, tray, network, Bluetooth, volume, battery, theme + notification buttons. The readouts open btop; network, Bluetooth and volume open their TUIs |
 | Themes | **cachy-theme**: 8 presets or colors generated from your wallpaper (matugen). One switch recolors everything |
 | Launcher | **Vicinae** or **Walker** (asked at install): apps, indexed file search, clipboard, calculator |
 | Login screen | **SDDM** + astronaut theme; `cachy-login-theme` switches its style or matches your desktop |
@@ -35,6 +35,7 @@ Install CachyOS with only `hyprland` + `kitty` from the Hyprland group (no Nocta
 | Screenshots | Print = instant, Super+Shift+S = annotate in Satty |
 | GPU | Detected and confirmed at install; NVIDIA desktop vs hybrid laptop handled differently |
 | Dev · Gaming | neovim, git, gh, lazygit, docker, node, python + uv, go, CLI tools; optional VSCodium; Vim upgraded with [amix/vimrc](https://github.com/amix/vimrc) (Awesome or Basic, asked at install) · CachyOS gaming meta-packages |
+| Creative | **Blender** (official repos), **FilmCraft** (video editing, color and sound; open-source Premiere Pro alternative), **LightCraft** (photo library and raw development; open-source Lightroom alternative). The two Craft apps come from the AUR `-bin` packages, or the project's checksum-verified release in `~/.local` if those aren't found |
 
 ## Themes
 
@@ -53,11 +54,11 @@ A switch updates the bar, window borders, kitty, GTK apps, notifications, the la
 
 ## System tools
 
-Every system tool is a terminal app that opens as a floating window in the middle of the screen. Press its key again to close it; if it's open behind other windows, the key brings it forward. They use kitty's colors, so they follow your theme.
+Every system tool is a terminal app that opens as a floating window in the middle of the screen. If one exits with an error, its window stays open showing the message until you press Enter. Press its key again to close it; if it's open behind other windows, the key brings it forward. They use kitty's colors, so they follow your theme.
 
 | Keys | Tool | Also opens from |
 |---|---|---|
-| Super + Alt + W | **wlctl**: Wi-Fi, Ethernet, WireGuard, hotspot (NetworkManager) | Bar network icon, launcher "Wi-Fi" |
+| Super + Alt + W | **wlctl**: Wi-Fi, Ethernet, WireGuard, hotspot (NetworkManager). On a machine with no Wi-Fi adapter, opens **nmtui** instead | Bar network icon, launcher "Wi-Fi" |
 | Super + Alt + B | **bluetui**: pair and connect Bluetooth devices | Bar Bluetooth icon, launcher "Bluetooth" |
 | Super + Alt + A | **wiremix**: volume per app, outputs, inputs (PipeWire) | Click the bar volume, launcher "Sound" |
 | Super + Alt + P | **Pacsea**: search, install, update and remove packages, Arch news, AUR scans | Launcher "Packages" |
@@ -108,7 +109,7 @@ Super + / shows every bind, including ones you add.
 ```
 --launcher vicinae|walker     --gpu amd|nvidia|intel|hybrid
 --editor none|codium   --vimrc awesome|basic|none   --theme <preset>|wallpaper
---no-dev  --no-gaming  --no-everyday  --keep-firefox  --keep-gui-tools  --no-login-screen
+--no-dev  --no-gaming  --no-everyday  --no-creative  --keep-firefox  --keep-gui-tools  --no-login-screen
 -y, --yes      unattended (also skips paru's PKGBUILD review)
 --dry-run      show actions, change nothing
 ```
@@ -121,3 +122,5 @@ Re-running is safe. Packages use `--needed`, old configs go to `~/.config/cachy-
 - **NVIDIA:** if the first animation after a pause stutters, that's the GPU waking from low clocks, a known driver behavior, not the config.
 - **Hybrid laptops:** the desktop runs on the integrated GPU. Use `prime-run %command%` in Steam launch options for games.
 - Vicinae sends anonymous system info once a day by default; turn it off in its settings (`telemetry`).
+- **FilmCraft / LightCraft from `~/.local`:** that's the fallback when the AUR packages aren't found. It's pinned to the release whose checksums were verified (0.8.0); re-run the installer after updating `STORYTOLD_VER` to move to a newer one. AUR installs update with the rest of the system.
+- **LightCraft on Wayland** runs through XWayland by default so drag-and-drop works; set `LIGHTCRAFT_WAYLAND=1` for native Wayland (sharper fractional scaling, no drop).

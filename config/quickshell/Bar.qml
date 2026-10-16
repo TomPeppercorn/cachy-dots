@@ -1,6 +1,6 @@
 // cachy-dots · top bar
 // Left: workspaces + focused window · Center: clock
-// Right: tray, network, Bluetooth, volume, battery, theme, notifications
+// Right: CPU · RAM · net speed, tray, network, Bluetooth, volume, battery, theme, notifications
 
 import Quickshell
 import Quickshell.Hyprland
@@ -136,6 +136,13 @@ PanelWindow {
             anchors.rightMargin: 12
             anchors.verticalCenter: parent.verticalCenter
             spacing: 14
+
+            // CPU, RAM, download/upload (click for btop). Loaded separately like the icons below.
+            Loader {
+                source: Qt.resolvedUrl("StatsIndicator.qml")
+                visible: status === Loader.Ready
+                Layout.alignment: Qt.AlignVCenter
+            }
 
             // System tray
             Row {

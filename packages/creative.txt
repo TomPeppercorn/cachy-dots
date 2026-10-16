@@ -1,0 +1,4 @@
+# Creative apps from the official repos. FilmCraft (video) and LightCraft (photos) come from the
+# AUR or their official releases — see the "creative apps" step in install.sh.
+blender
+alsa-lib

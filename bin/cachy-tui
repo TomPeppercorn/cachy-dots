@@ -2,6 +2,7 @@
 # cachy-dots · system TUIs in a floating kitty window
 #
 #   cachy-tui wifi        Wi-Fi, Ethernet, VPN   (wlctl)     Super+Alt+W · bar network icon
+#                         no Wi-Fi adapter (Ethernet only) → nmtui, NetworkManager's own TUI
 #   cachy-tui bluetooth   Bluetooth              (bluetui)   Super+Alt+B · bar Bluetooth icon
 #   cachy-tui audio       Sound mixer            (wiremix)   Super+Alt+A · click the bar volume
 #   cachy-tui packages    Install/update/remove  (pacsea)    Super+Alt+P
@@ -22,6 +23,12 @@ esac
 
 class="cachy-tui-$1"   # window rules in ~/.config/hypr/cachy/rules.lua match on this (and set the size)
 
+# wlctl only manages Wi-Fi adapters and quits with "No WiFi device found" without one.
+# On Ethernet-only machines use nmtui (ships with NetworkManager): connections, VPN, hostname.
+if [[ "$1" == wifi ]] && command -v nmcli >/dev/null && ! nmcli -t -f TYPE device 2>/dev/null | grep -qx wifi; then
+    cmd=nmtui; pkg=networkmanager; title="Network"
+fi
+
 if ! command -v "$cmd" >/dev/null; then
     notify-send -a cachy-tui "$title: '$cmd' isn't installed" "Re-run the cachy-dots installer, or: paru -S $pkg" 2>/dev/null
     exit 1
@@ -39,4 +46,6 @@ if [[ -n "$addr" ]]; then
     exit 0
 fi
 
-exec kitty --class "$class" --title "$title" -e "$cmd"
+# If the tool exits with an error, keep the window open so the message can be read
+exec kitty --class "$class" --title "$title" -e sh -c \
+    "$cmd || { printf '\\n%s exited with an error (see above). Press Enter to close.' '$cmd'; read -r _; }"
