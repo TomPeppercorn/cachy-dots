@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# cachy-dots · screenshots (grim + slurp, Satty for annotating)
+#
+#   cachy-screenshot region     select an area → save + copy instantly      (Print)
+#   cachy-screenshot annotate   select an area → open Satty to mark it up   (Super+Shift+S)
+#   cachy-screenshot screen     the focused monitor → save + copy           (Shift+Print)
+#   cachy-screenshot window     the focused window → save + copy            (Alt+Print)
+#
+# Files go to ~/Pictures/Screenshots. Press Esc while selecting to cancel.
+set -uo pipefail
+
+mode="${1:-region}"
+dir="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")/Screenshots"
+mkdir -p "$dir"
+file="$dir/$(date +%Y-%m-%d_%H-%M-%S).png"
+
+focused_monitor()    { hyprctl -j monitors | jq -r '.[] | select(.focused) | .name'; }
+active_window_geom() { hyprctl -j activewindow | jq -r '"\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"'; }
+
+# Pick the area in THIS shell, so cancelling slurp (Esc) really cancels
+declare -a args=()
+case "$mode" in
+    region|annotate) g="$(slurp -d)" || exit 0; args=(-g "$g") ;;
+    screen)          args=(-o "$(focused_monitor)") ;;
+    window)          args=(-g "$(active_window_geom)") ;;
+    *) echo "usage: cachy-screenshot region|annotate|screen|window" >&2; exit 1 ;;
+esac
+
+if [[ "$mode" == annotate ]]; then
+    grim "${args[@]}" - | satty --filename - --output-filename "$file" \
+        --copy-command wl-copy --early-exit
+else
+    grim "${args[@]}" "$file" && wl-copy < "$file" &&
+        notify-send -a Screenshot -i "$file" "Screenshot saved" "Copied to clipboard · $(basename "$file")"
+fi

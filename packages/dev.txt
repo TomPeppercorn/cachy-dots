@@ -1,0 +1,20 @@
+# Dev tools
+base-devel
+git
+github-cli
+lazygit
+neovim
+ripgrep
+fd
+fzf
+bat
+eza
+zoxide
+docker
+docker-compose
+docker-buildx
+nodejs
+npm
+python
+uv
+go

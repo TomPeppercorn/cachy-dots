@@ -1,0 +1,647 @@
+#!/usr/bin/env python3
+"""cachy-theme — one palette, every app.
+
+  cachy-theme                     show the current theme
+  cachy-theme list [--json]       list themes (presets + "wallpaper")
+  cachy-theme set <id>            switch theme, e.g. gruvbox-dark, nord, wallpaper
+  cachy-theme wallpaper <image>   change wallpaper (recolors everything if theme = wallpaper)
+  cachy-theme pick                choose a theme from the launcher
+  cachy-theme pick-wallpaper      choose a wallpaper from the launcher (with previews in Vicinae)
+  cachy-theme variant dark|light  light or dark colors for the "wallpaper" theme
+  cachy-theme apply [--no-reload] re-render the current theme (the installer uses this)
+
+Presets live in ~/.config/cachy-dots/themes/*.json — copy one, edit it, and it shows up here.
+"wallpaper" builds a palette from your wallpaper with matugen (Material You), like Noctalia.
+"""
+import colorsys
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+HOME = Path.home()
+CFG = Path(os.environ.get("XDG_CONFIG_HOME") or HOME / ".config")      # empty counts as unset
+DATA = Path(os.environ.get("XDG_DATA_HOME") or HOME / ".local/share")
+CD = CFG / "cachy-dots"
+THEMES = CD / "themes"
+STATE = CD / "state.json"
+WALLPAPER_LINK = CD / "wallpaper"
+WALLPAPER_DIRS = [CD / "wallpapers", HOME / "Pictures" / "Wallpapers"]
+IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp"}
+FONT_UI, FONT_MONO = "IBM Plex Sans", "BlexMono Nerd Font"
+
+
+# ── small helpers ────────────────────────────────────────────────
+def die(msg):
+    print(f"cachy-theme: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def write(path: Path, text: str):
+    """Write in place (not rename) so file watchers (Quickshell, Vicinae) keep their watch."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+
+
+def run(*cmd, quiet=True):
+    if not shutil.which(cmd[0]):
+        return False
+    try:
+        subprocess.run(cmd, check=False, timeout=15,
+                       stdout=subprocess.DEVNULL if quiet else None,
+                       stderr=subprocess.DEVNULL if quiet else None)
+        return True
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def spawn(*cmd):
+    """Start a long-running program fully detached from us."""
+    if shutil.which(cmd[0]):
+        subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+def hx(c):
+    c = c.lstrip("#")
+    return tuple(int(c[i:i + 2], 16) / 255 for i in (0, 2, 4))
+
+
+def to_hex(rgb):
+    return "#" + "".join(f"{max(0, min(255, round(v * 255))):02x}" for v in rgb)
+
+
+def rgb_csv(c):
+    return ", ".join(str(round(v * 255)) for v in hx(c))
+
+
+def luminance(c):
+    def ch(v):
+        return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+    r, g, b = (ch(v) for v in hx(c))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def readable_on(bg, a, b):
+    """Return whichever of a/b contrasts more with bg."""
+    def contrast(x, y):
+        l1, l2 = sorted((luminance(x), luminance(y)), reverse=True)
+        return (l1 + 0.05) / (l2 + 0.05)
+    return a if contrast(bg, a) >= contrast(bg, b) else b
+
+
+def mix(c1, c2, t):
+    a, b = hx(c1), hx(c2)
+    return to_hex(tuple(x + (y - x) * t for x, y in zip(a, b)))
+
+
+# ── state ────────────────────────────────────────────────────────
+def load_state():
+    try:
+        return json.loads(STATE.read_text())
+    except (OSError, ValueError):
+        return {"theme": "gruvbox-dark", "variant": "dark"}
+
+
+def save_state(st):
+    write(STATE, json.dumps(st, indent=2) + "\n")
+
+
+def presets():
+    out = {}
+    for f in sorted(THEMES.glob("*.json")):
+        try:
+            d = json.loads(f.read_text())
+            out[f.stem] = d
+        except (OSError, ValueError) as e:
+            print(f"cachy-theme: skipping {f.name}: {e}", file=sys.stderr)
+    return out
+
+
+def current_wallpaper():
+    try:
+        return WALLPAPER_LINK.resolve(strict=True)
+    except OSError:
+        return None
+
+
+# ── wallpaper → palette (matugen) ────────────────────────────────
+MATUGEN_TEMPLATE = """{
+  "bg": "{{colors.surface_container_lowest.default.hex}}",
+  "surface": "{{colors.surface.default.hex}}",
+  "overlay": "{{colors.surface_container_high.default.hex}}",
+  "border": "{{colors.outline_variant.default.hex}}",
+  "fg": "{{colors.on_surface.default.hex}}",
+  "muted": "{{colors.on_surface_variant.default.hex}}",
+  "primary": "{{colors.primary.default.hex}}",
+  "secondary": "{{colors.secondary.default.hex}}",
+  "tertiary": "{{colors.tertiary.default.hex}}",
+  "error": "{{colors.error.default.hex}}"
+}
+"""
+
+
+def matugen_palette(image: Path, variant: str):
+    if not shutil.which("matugen"):
+        die("matugen isn't installed (sudo pacman -S matugen)")
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        (td / "in.json").write_text(MATUGEN_TEMPLATE)
+        (td / "config.toml").write_text(
+            "[config]\n\n[templates.cachy]\n"
+            f"input_path = '{td / 'in.json'}'\noutput_path = '{td / 'out.json'}'\n")
+        base = ["matugen", "image", str(image), "-m", variant, "-c", str(td / "config.toml")]
+        help_text = subprocess.run(["matugen", "--help"], capture_output=True, text=True).stdout
+        if "source-color-index" in help_text:   # newer matugen asks interactively otherwise
+            base += ["--source-color-index", "0"]
+        r = subprocess.run(base, capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        if r.returncode != 0 or not (td / "out.json").exists():
+            die("matugen failed:\n" + (r.stderr or r.stdout))
+        m = json.loads((td / "out.json").read_text())
+
+    # Material You only gives a few hues; derive the rest so terminals still have red/green/etc.,
+    # nudged toward the wallpaper's primary hue so they sit in the same family.
+    ph, pl, ps = colorsys.rgb_to_hls(*hx(m["primary"]))
+    light = variant == "light"
+
+    def hue(deg, bright=False):
+        h = deg / 360
+        d = ((ph - h + 0.5) % 1) - 0.5           # signed distance to primary hue
+        h = (h + max(-0.04, min(0.04, d * 0.25))) % 1
+        lum = (0.38 if light else 0.70) + (0.06 if bright and not light else 0)
+        sat = max(0.45, min(0.75, ps + 0.1))
+        return to_hex(colorsys.hls_to_rgb(h, lum, sat))
+
+    red, green, yellow = m["error"], hue(120), hue(45)
+    blue, magenta, cyan, orange = hue(215), hue(300), hue(180), hue(25)
+    fg, muted = m["fg"], m["muted"]
+    term = [m["overlay"], red, green, yellow, blue, magenta, cyan, mix(fg, m["surface"], 0.2),
+            m["border"] if not light else muted, red, hue(120, True), hue(45, True),
+            hue(215, True), hue(300, True), hue(180, True), fg]
+    return {
+        "name": "From wallpaper", "variant": variant,
+        "bg": m["bg"], "surface": m["surface"], "overlay": m["overlay"], "border": m["border"],
+        "fg": fg, "muted": muted, "accent": m["primary"], "accent2": m["tertiary"],
+        "red": red, "green": green, "yellow": yellow, "blue": blue,
+        "magenta": magenta, "cyan": cyan, "orange": orange, "term": term,
+    }
+
+
+# ── renderers: one per app ───────────────────────────────────────
+def r_quickshell(p):
+    q = {k: p[k] for k in ("name", "variant", "bg", "surface", "overlay", "border", "fg", "muted",
+                           "accent", "accent2", "red", "green", "yellow", "blue", "magenta", "cyan", "orange")}
+    q["onAccent"] = readable_on(p["accent"], p["bg"], p["fg"])
+    write(CD / "palette.json", json.dumps(q, indent=2, ensure_ascii=False) + "\n")
+
+
+def r_kitty(p):
+    t = p["term"]
+    on_acc = readable_on(p["accent"], p["bg"], p["fg"])
+    lines = [f"# Generated by cachy-theme ({p['name']}) — edits here are overwritten",
+             f"foreground {p['fg']}", f"background {p['surface']}",
+             f"selection_foreground {on_acc}", f"selection_background {p['accent']}",
+             f"cursor {p['fg']}", f"cursor_text_color {p['surface']}", f"url_color {p['blue']}",
+             f"active_border_color {p['accent']}", f"inactive_border_color {p['overlay']}",
+             f"active_tab_foreground {on_acc}", f"active_tab_background {p['accent']}",
+             f"inactive_tab_foreground {p['muted']}", f"inactive_tab_background {p['overlay']}"]
+    lines += [f"color{i} {c}" for i, c in enumerate(t)]
+    write(CFG / "kitty/theme.conf", "\n".join(lines) + "\n")
+
+
+def r_hyprland(p):
+    a1, a2 = p["accent"].lstrip("#"), p["accent2"].lstrip("#")
+    write(CFG / "hypr/cachy/theme.lua", f"""-- Generated by cachy-theme ({p['name']}) — edits here are overwritten.
+-- Change colors with Super+Shift+T, or `cachy-theme set <name>`.
+hl.config({{
+    general = {{
+        col = {{
+            active_border   = {{ colors = {{ "rgba({a1}ff)", "rgba({a2}ff)" }}, angle = 45 }},
+            inactive_border = "rgba({p['overlay'].lstrip('#')}ff)",
+        }},
+    }},
+    decoration = {{
+        shadow = {{ color = 0xaa{p['bg'].lstrip('#')} }},
+    }},
+}})
+""")
+
+
+def r_gtk(p):
+    on_acc = readable_on(p["accent"], p["bg"], p["fg"])
+    shade = "rgba(0, 0, 0, 0.36)" if p["variant"] == "dark" else "rgba(0, 0, 0, 0.07)"
+    card = mix(p["surface"], p["fg"], 0.05)
+    css = f"""/* Generated by cachy-theme ({p['name']}) for GTK4/libadwaita and adw-gtk3. Edits are overwritten. */
+@define-color accent_color {p['accent']};
+@define-color accent_bg_color {p['accent']};
+@define-color accent_fg_color {on_acc};
+@define-color destructive_color {p['red']};
+@define-color destructive_bg_color {p['red']};
+@define-color destructive_fg_color {readable_on(p['red'], p['bg'], p['fg'])};
+@define-color success_color {p['green']};
+@define-color success_bg_color {p['green']};
+@define-color success_fg_color {readable_on(p['green'], p['bg'], p['fg'])};
+@define-color warning_color {p['yellow']};
+@define-color warning_bg_color {p['yellow']};
+@define-color warning_fg_color {readable_on(p['yellow'], p['bg'], p['fg'])};
+@define-color error_color {p['red']};
+@define-color error_bg_color {p['red']};
+@define-color error_fg_color {readable_on(p['red'], p['bg'], p['fg'])};
+@define-color window_bg_color {p['surface']};
+@define-color window_fg_color {p['fg']};
+@define-color view_bg_color {p['bg']};
+@define-color view_fg_color {p['fg']};
+@define-color headerbar_bg_color {p['overlay']};
+@define-color headerbar_fg_color {p['fg']};
+@define-color headerbar_border_color {p['border']};
+@define-color headerbar_backdrop_color @window_bg_color;
+@define-color headerbar_shade_color {shade};
+@define-color sidebar_bg_color {p['overlay']};
+@define-color sidebar_fg_color {p['fg']};
+@define-color sidebar_backdrop_color {p['surface']};
+@define-color sidebar_shade_color {shade};
+@define-color card_bg_color {card};
+@define-color card_fg_color {p['fg']};
+@define-color card_shade_color {shade};
+@define-color dialog_bg_color {p['overlay']};
+@define-color dialog_fg_color {p['fg']};
+@define-color popover_bg_color {p['overlay']};
+@define-color popover_fg_color {p['fg']};
+@define-color popover_shade_color {shade};
+@define-color shade_color {shade};
+@define-color scrollbar_outline_color {shade};
+"""
+    for d in ("gtk-3.0", "gtk-4.0"):
+        write(CFG / d / "gtk.css", css)
+
+
+def gsettings_apply(p):
+    dark = p["variant"] == "dark"
+    for key, val in (("color-scheme", "prefer-dark" if dark else "prefer-light"),
+                     ("gtk-theme", "adw-gtk3-dark" if dark else "adw-gtk3"),
+                     ("icon-theme", "Papirus-Dark" if dark else "Papirus")):
+        run("gsettings", "set", "org.gnome.desktop.interface", key, val)
+
+
+def r_hyprlock(p):
+    rgba = lambda c, a="ff": f"rgba({c.lstrip('#')}{a})"
+    write(CFG / "hypr/hyprlock.conf", f"""# Generated by cachy-theme ({p['name']}) — edits here are overwritten.
+general {{
+    hide_cursor = true
+}}
+
+background {{
+    monitor =
+    path = {WALLPAPER_LINK}
+    blur_passes = 3
+    blur_size = 6
+    color = {rgba(p['surface'])}
+}}
+
+label {{
+    monitor =
+    text = $TIME
+    color = {rgba(p['fg'])}
+    font_size = 72
+    font_family = {FONT_UI} SemiBold
+    position = 0, 160
+    halign = center
+    valign = center
+}}
+
+label {{
+    monitor =
+    text = cmd[update:60000] date +"%A, %d %B"
+    color = {rgba(p['muted'])}
+    font_size = 16
+    font_family = {FONT_UI}
+    position = 0, 90
+    halign = center
+    valign = center
+}}
+
+input-field {{
+    monitor =
+    size = 300, 50
+    outline_thickness = 2
+    outer_color = {rgba(p['accent'])}
+    inner_color = {rgba(p['surface'], 'ee')}
+    font_color = {rgba(p['fg'])}
+    font_family = {FONT_MONO}
+    check_color = {rgba(p['green'])}
+    fail_color = {rgba(p['red'])}
+    placeholder_text = password
+    rounding = 10
+    fade_on_empty = false
+    position = 0, -20
+    halign = center
+    valign = center
+}}
+""")
+
+
+def r_swaync(p):
+    write(CFG / "swaync/style.css", f"""/* Generated by cachy-theme ({p['name']}): swaync's own style, recolored. Edits are overwritten. */
+@import url("file:///etc/xdg/swaync/style.css");
+
+:root {{
+  --cc-bg: rgba({rgb_csv(p['surface'])}, 0.94);
+  --noti-border-color: rgba({rgb_csv(p['border'])}, 0.9);
+  --noti-bg: {rgb_csv(p['surface'])};
+  --noti-bg-alpha: 0.96;
+  --noti-bg-darker: {p['bg']};
+  --noti-bg-hover: {p['overlay']};
+  --noti-bg-focus: rgba({rgb_csv(p['overlay'])}, 0.8);
+  --noti-close-bg: {p['overlay']};
+  --noti-close-bg-hover: {p['border']};
+  --text-color: {p['fg']};
+  --text-color-disabled: {p['muted']};
+  --bg-selected: {p['accent']};
+}}
+
+* {{ font-family: "{FONT_UI}", sans-serif; }}
+""")
+
+
+def r_btop(p):
+    lines = {
+        "main_bg": p["surface"], "main_fg": p["fg"], "title": p["fg"], "hi_fg": p["accent"],
+        "selected_bg": p["overlay"], "selected_fg": p["accent"], "inactive_fg": p["muted"],
+        "graph_text": p["fg"], "meter_bg": p["overlay"], "proc_misc": p["accent2"],
+        "cpu_box": p["accent"], "mem_box": p["green"], "net_box": p["magenta"], "proc_box": p["blue"],
+        "div_line": p["border"],
+        "temp_start": p["green"], "temp_mid": p["yellow"], "temp_end": p["red"],
+        "cpu_start": p["green"], "cpu_mid": p["yellow"], "cpu_end": p["red"],
+        "free_start": p["green"], "free_mid": p["green"], "free_end": p["green"],
+        "cached_start": p["blue"], "cached_mid": p["blue"], "cached_end": p["blue"],
+        "available_start": p["cyan"], "available_mid": p["cyan"], "available_end": p["cyan"],
+        "used_start": p["yellow"], "used_mid": p["orange"], "used_end": p["red"],
+        "download_start": p["blue"], "download_mid": p["magenta"], "download_end": p["accent"],
+        "upload_start": p["green"], "upload_mid": p["yellow"], "upload_end": p["orange"],
+        "process_start": p["accent"], "process_mid": p["accent2"], "process_end": p["red"],
+    }
+    body = "\n".join(f'theme[{k}]="{v}"' for k, v in lines.items())
+    write(CFG / "btop/themes/cachy.theme", f"# Generated by cachy-theme ({p['name']})\n{body}\n")
+    conf = CFG / "btop/btop.conf"
+    try:
+        txt = conf.read_text()
+    except OSError:
+        txt = ""
+    out, found = [], False
+    for line in txt.splitlines():
+        if line.strip().startswith("color_theme"):
+            line, found = 'color_theme = "cachy"', True
+        out.append(line)
+    if not found:
+        out.insert(0, 'color_theme = "cachy"')
+    write(conf, "\n".join(out) + "\n")
+
+
+def r_vicinae(p):
+    on_acc = readable_on(p["accent"], p["bg"], p["fg"])
+    write(DATA / "vicinae/themes/cachy.toml", f"""# Generated by cachy-theme ({p['name']}) — edits here are overwritten.
+[meta]
+version = 1
+name = "Cachy"
+description = "Follows cachy-theme ({p['name']})"
+variant = "{p['variant']}"
+
+[colors.core]
+background = "{p['surface']}"
+foreground = "{p['fg']}"
+secondary_background = "{p['overlay']}"
+border = "{p['border']}"
+accent = "{p['accent']}"
+accent_foreground = "{on_acc}"
+
+[colors.accents]
+red = "{p['red']}"
+green = "{p['green']}"
+yellow = "{p['yellow']}"
+blue = "{p['blue']}"
+magenta = "{p['magenta']}"
+purple = "{p['magenta']}"
+cyan = "{p['cyan']}"
+orange = "{p['orange']}"
+
+[colors.text]
+muted = "{p['muted']}"
+
+[colors.input]
+border_focus = "{p['accent']}"
+""")
+
+
+def r_walker(p):
+    on_acc = readable_on(p["accent"], p["bg"], p["fg"])
+    write(CFG / "walker/themes/cachy/style.css", f"""/* Generated by cachy-theme ({p['name']}) — edits here are overwritten. */
+* {{ all: unset; font-family: "{FONT_UI}", sans-serif; }}
+
+.box-wrapper {{
+  background: {p['surface']};
+  color: {p['fg']};
+  border: 2px solid {p['accent']};
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}}
+
+.search-container {{
+  background: {p['overlay']};
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}}
+
+.input {{ color: {p['fg']}; caret-color: {p['accent']}; }}
+.input placeholder, .placeholder, .elephant-hint {{ color: {p['muted']}; }}
+.input selection {{ background: {p['accent']}; color: {on_acc}; }}
+
+.list {{ color: {p['fg']}; }}
+.item-box {{ padding: 6px 10px; border-radius: 8px; }}
+.item-subtext {{ color: {p['muted']}; font-size: 0.85em; }}
+.item-quick-activation {{ color: {p['muted']}; }}
+child:selected .item-box, row:selected .item-box {{ background: {p['overlay']}; }}
+child:selected .item-text-box, row:selected .item-text-box {{ color: {p['accent']}; }}
+
+.normal-icons {{ -gtk-icon-size: 18px; }}
+.large-icons {{ -gtk-icon-size: 32px; }}
+
+.preview {{ border-left: 1px solid {p['border']}; padding-left: 10px; color: {p['fg']}; }}
+.keybinds {{ color: {p['muted']}; padding-top: 6px; }}
+.keybind-bind {{ color: {p['accent']}; }}
+.error {{ color: {p['red']}; }}
+scrollbar {{ opacity: 0; }}
+popover {{ background: {p['overlay']}; border: 1px solid {p['border']}; border-radius: 10px; padding: 8px; }}
+""")
+
+
+RENDERERS = [r_quickshell, r_kitty, r_hyprland, r_gtk, r_hyprlock, r_swaync, r_btop, r_vicinae, r_walker]
+
+
+# ── reload running apps ──────────────────────────────────────────
+def in_session():
+    return bool(os.environ.get("HYPRLAND_INSTANCE_SIGNATURE") or os.environ.get("WAYLAND_DISPLAY"))
+
+
+def reload_all(p):
+    gsettings_apply(p)
+    if not in_session():
+        return
+    run("pkill", "-USR1", "-x", "kitty")          # kitty re-reads its config
+    run("hyprctl", "reload")
+    run("swaync-client", "--reload-css")
+    if subprocess.run(["pgrep", "-x", "walker"], capture_output=True).returncode == 0:
+        run("pkill", "-x", "walker")              # Walker caches CSS in its service
+        spawn("walker", "--gapplication-service")
+    # Quickshell and Vicinae watch their files and update by themselves.
+
+
+def restart_wallpaper():
+    if not in_session() or current_wallpaper() is None:
+        return
+    run("pkill", "-x", "swaybg")
+    spawn("swaybg", "-m", "fill", "-i", str(WALLPAPER_LINK))
+
+
+# ── commands ─────────────────────────────────────────────────────
+def resolve_palette(st):
+    if st.get("theme") == "wallpaper":
+        wp = current_wallpaper()
+        if wp is None:
+            die("no wallpaper set — run: cachy-theme wallpaper <image>")
+        return matugen_palette(wp, st.get("wallpaper_variant", "dark"))
+    ps = presets()
+    if st.get("theme") not in ps:
+        if not ps:
+            die(f"no themes found in {THEMES}")
+        st["theme"] = "gruvbox-dark" if "gruvbox-dark" in ps else next(iter(ps))
+    return ps[st["theme"]]
+
+
+def apply(reload=True):
+    st = load_state()
+    p = resolve_palette(st)
+    for r in RENDERERS:
+        try:
+            r(p)
+        except Exception as e:  # one broken target shouldn't block the rest
+            print(f"cachy-theme: {r.__name__[2:]} skipped: {e}", file=sys.stderr)
+    save_state(st)
+    if reload:
+        reload_all(p)
+    else:
+        gsettings_apply(p)
+    return p
+
+
+def cmd_set(tid):
+    st = load_state()
+    if tid != "wallpaper" and tid not in presets():
+        die(f"unknown theme '{tid}'. Try: cachy-theme list")
+    st["theme"] = tid
+    if tid != "wallpaper":
+        st["variant"] = presets()[tid].get("variant", "dark")
+    save_state(st)
+    p = apply()
+    notify(f"Theme: {p['name']}")
+
+
+def cmd_wallpaper(path):
+    img = Path(path).expanduser().resolve()
+    if not img.is_file():
+        die(f"not a file: {img}")
+    CD.mkdir(parents=True, exist_ok=True)
+    if WALLPAPER_LINK.is_symlink() or WALLPAPER_LINK.exists():
+        WALLPAPER_LINK.unlink()
+    WALLPAPER_LINK.symlink_to(img)
+    st = load_state()
+    st["wallpaper"] = str(img)
+    save_state(st)
+    restart_wallpaper()
+    if st.get("theme") == "wallpaper":
+        apply()
+        notify("Wallpaper + colors updated")
+
+
+def notify(msg):
+    if in_session():
+        run("notify-send", "-a", "cachy-theme", "-i", "preferences-desktop-theme", msg)
+    print(msg)
+
+
+def launcher_menu(lines, prompt):
+    exe = shutil.which("cachy-launcher") or str(HOME / ".local/bin/cachy-launcher")
+    r = subprocess.run([exe, "dmenu", prompt], input="\n".join(lines), capture_output=True, text=True)
+    return r.stdout.strip()
+
+
+def cmd_list(as_json):
+    ps = presets()
+    st = load_state()
+    if as_json:
+        items = [{"id": k, "name": v.get("name", k), "variant": v.get("variant", "dark"),
+                  "colors": [v[c] for c in ("surface", "accent", "accent2", "red", "green", "blue")],
+                  "active": st.get("theme") == k} for k, v in ps.items()]
+        items.append({"id": "wallpaper", "name": "From wallpaper", "variant": st.get("wallpaper_variant", "dark"),
+                      "colors": [], "active": st.get("theme") == "wallpaper"})
+        print(json.dumps(items))
+        return
+    for k, v in ps.items():
+        print(f"{'*' if st.get('theme') == k else ' '} {k:<18} {v.get('name', k)}")
+    print(f"{'*' if st.get('theme') == 'wallpaper' else ' '} {'wallpaper':<18} Colors from your wallpaper")
+
+
+def cmd_pick():
+    ps = presets()
+    labels = {f"{v.get('name', k)}": k for k, v in ps.items()}
+    labels["From wallpaper"] = "wallpaper"
+    choice = launcher_menu(list(labels), "Theme")
+    if choice in labels:
+        cmd_set(labels[choice])
+
+
+def cmd_pick_wallpaper():
+    imgs = []
+    for d in WALLPAPER_DIRS:
+        if d.is_dir():
+            imgs += sorted(str(f) for f in d.rglob("*") if f.suffix.lower() in IMAGE_EXT)
+    if not imgs:
+        die("no images in ~/Pictures/Wallpapers or ~/.config/cachy-dots/wallpapers")
+    choice = launcher_menu(imgs, "Wallpaper")
+    if choice:
+        cmd_wallpaper(choice)
+
+
+def main(argv):
+    if not argv:
+        st = load_state()
+        print(f"theme: {st.get('theme')}  wallpaper: {current_wallpaper()}")
+        return
+    cmd, rest = argv[0], argv[1:]
+    if cmd in ("-h", "--help", "help"):
+        print(__doc__.strip())
+    elif cmd == "list":
+        cmd_list("--json" in rest)
+    elif cmd == "set" and rest:
+        cmd_set(rest[0])
+    elif cmd == "wallpaper" and rest:
+        cmd_wallpaper(rest[0])
+    elif cmd == "pick":
+        cmd_pick()
+    elif cmd == "pick-wallpaper":
+        cmd_pick_wallpaper()
+    elif cmd == "apply":
+        apply(reload="--no-reload" not in rest)
+    elif cmd == "variant" and rest and rest[0] in ("dark", "light"):
+        st = load_state(); st["wallpaper_variant"] = rest[0]; save_state(st); apply()
+    else:
+        die("unknown command. See: cachy-theme --help")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

@@ -1,0 +1,61 @@
+# Hyprland desktop core — always installed
+hyprland
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+hyprpolkitagent
+hyprlock
+hypridle
+quickshell
+swaync
+swaybg
+kitty
+
+# Clipboard, screenshots plumbing, notifications
+wl-clipboard
+jq
+libnotify
+xdg-user-dirs
+xdg-utils
+
+# Audio, media keys, power, network, bluetooth
+pipewire
+pipewire-pulse
+wireplumber
+pavucontrol
+playerctl
+brightnessctl
+upower
+network-manager-applet
+bluez
+bluez-utils
+blueman
+
+# Look & feel
+ttf-ibmplex-mono-nerd
+ttf-ibm-plex
+noto-fonts
+noto-fonts-emoji
+papirus-icon-theme
+adw-gtk-theme
+gnome-keyring
+btop
+
+# File managers: Thunar (GUI, Super+E) + Yazi (terminal, Super+Shift+E)
+thunar
+thunar-volman
+thunar-archive-plugin
+gvfs
+tumbler
+ffmpegthumbnailer
+yazi
+7zip
+poppler
+
+# Screenshots: Print = instant save, Super+Shift+S = annotate in Satty
+grim
+slurp
+satty
+
+# Theme manager (cachy-theme): wallpaper-based colors + its runtime
+matugen
+python

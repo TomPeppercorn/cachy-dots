@@ -1,0 +1,1 @@
+-- HyprMod writes the settings you change in its app here (Super+,). Safe to leave empty.

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# cachy-dots · keybind cheatsheet (Super + /)
+# Reads your live bind files, so binds you add in user.lua show up here too.
+# Tip: end a bind line with  -- description  and that's what gets shown.
+set -uo pipefail
+files=("$HOME/.config/hypr/cachy/binds.lua" "$HOME/.config/hypr/user.lua")
+
+list_binds() {
+    printf '%-26s  %s\n' "SUPER + 1-0" "Go to workspace"
+    printf '%-26s  %s\n' "SUPER + SHIFT + 1-0" "Move window to workspace"
+    grep -h -E '^[[:space:]]*hl\.bind\(' "${files[@]}" 2>/dev/null \
+        | grep -v '" \.\. key' \
+        | sed -E 's/^[[:space:]]*hl\.bind\(//
+                  s/^mod \.\. "/"SUPER/
+                  s/^"([^"]*)",[[:space:]]*(.*)$/\1\t\2/' \
+        | awk -F'\t' '{
+              keys = $1; rest = $2; d = rest
+              i = index(rest, "-- ")
+              if (i > 0) d = substr(rest, i + 3)
+              else { gsub(/hl\.dsp\./, "", d); sub(/\)[[:space:]]*$/, "", d) }
+              printf "%-26s  %s\n", keys, d
+          }'
+}
+
+list_binds | "$HOME/.local/bin/cachy-launcher" dmenu "Keybinds" >/dev/null

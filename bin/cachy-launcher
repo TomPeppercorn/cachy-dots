@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# cachy-dots · one front door for whichever launcher you installed (Vicinae or Walker)
+#
+#   cachy-launcher            open the launcher (apps, files, calculator…)   Super+Space
+#   cachy-launcher clipboard  clipboard history                               Super+V
+#   cachy-launcher files      file search                                     Super+Shift+F
+#   cachy-launcher dmenu [p]  pick from lines on stdin, prints the choice     (used by scripts)
+#   cachy-launcher daemon     start the launcher's background service         (autostart)
+#
+# Which launcher: LAUNCHER= in ~/.config/cachy-dots/settings (vicinae | walker).
+set -uo pipefail
+
+LAUNCHER=vicinae
+settings="$HOME/.config/cachy-dots/settings"
+# shellcheck source=/dev/null
+[[ -f "$settings" ]] && . "$settings"
+
+cmd="${1:-toggle}"
+prompt="${2:-Search}"
+
+case "$LAUNCHER:$cmd" in
+    vicinae:toggle)    exec vicinae toggle ;;
+    vicinae:clipboard) exec vicinae vicinae://launch/clipboard/history ;;
+    vicinae:files)     exec vicinae vicinae://launch/files/search ;;
+    vicinae:dmenu)     exec vicinae dmenu -p "$prompt" ;;
+    vicinae:daemon)    exec vicinae server --replace ;;
+
+    walker:toggle)     exec walker ;;
+    walker:clipboard)  exec walker -m clipboard ;;
+    walker:files)      exec walker -m files ;;
+    walker:dmenu)      exec walker -d -p "$prompt" ;;
+    walker:daemon)
+        pgrep -x elephant >/dev/null || { elephant & disown; }
+        sleep 1   # Walker needs Elephant up before it starts
+        exec walker --gapplication-service ;;
+
+    *:which)           echo "$LAUNCHER" ;;
+    *) echo "usage: cachy-launcher [toggle|clipboard|files|dmenu PROMPT|daemon|which]  (LAUNCHER=$LAUNCHER)" >&2; exit 1 ;;
+esac

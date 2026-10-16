@@ -1,0 +1,5 @@
+# Everyday apps from the official repos. Helium + Vesktop come from the AUR (see install.sh).
+# Firefox gets removed after Helium installs.
+mpv
+imv
+file-roller

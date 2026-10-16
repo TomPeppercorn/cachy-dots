@@ -1,0 +1,1 @@
+-- GPU settings, written by the cachy-dots installer. Nothing needed for AMD or Intel.

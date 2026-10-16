@@ -1,0 +1,4 @@
+# CachyOS gaming meta-packages (same set CachyOS Hello's "Install Gaming packages" button uses)
+# meta = libraries/runtime deps, applications = Steam, Lutris, Heroic, MangoHud, etc.
+cachyos-gaming-meta
+cachyos-gaming-applications

@@ -1,0 +1,7 @@
+-- Your personal Hyprland tweaks. The installer never overwrites this file.
+-- Anything here runs after the cachy-dots config, so it can add or replace binds.
+--
+-- Examples:
+-- hl.bind("SUPER + G", hl.dsp.exec_cmd("steam"))
+-- hl.bind("SUPER + C", hl.dsp.exec_cmd("code"))
+-- hl.monitor({ output = "DP-1", mode = "2560x1440@165", position = "0x0", scale = 1 })

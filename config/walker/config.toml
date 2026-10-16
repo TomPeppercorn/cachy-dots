@@ -1,0 +1,31 @@
+# cachy-dots · Walker. Colors come from cachy-theme (themes/cachy/style.css).
+theme = "cachy"
+close_when_open = true
+
+[providers]
+default = ["desktopapplications", "calc", "files"]
+empty = ["desktopapplications"]
+
+[[providers.prefixes]]
+prefix = "/"
+provider = "files"
+
+[[providers.prefixes]]
+prefix = ":"
+provider = "clipboard"
+
+[[providers.prefixes]]
+prefix = "="
+provider = "calc"
+
+[[providers.prefixes]]
+prefix = ">"
+provider = "runner"
+
+[[providers.prefixes]]
+prefix = "."
+provider = "symbols"
+
+[[providers.prefixes]]
+prefix = ";"
+provider = "providerlist"

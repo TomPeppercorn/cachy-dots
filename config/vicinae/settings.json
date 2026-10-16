@@ -1,0 +1,11 @@
+{
+  "$schema": "https://vicinae.com/schemas/config.json",
+  "search_files_in_root": true,
+  "escape_key_behavior": "close_window",
+  "pop_to_root_on_close": true,
+  "font": { "normal": { "family": "IBM Plex Sans" } },
+  "theme": {
+    "light": { "name": "cachy", "icon_theme": "auto" },
+    "dark": { "name": "cachy", "icon_theme": "auto" }
+  }
+}
