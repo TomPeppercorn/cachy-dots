@@ -11,6 +11,7 @@ local fileManager = "thunar"
 local launcher    = "~/.local/bin/cachy-launcher"
 local discord     = "vesktop"
 local screenshot  = "~/.local/bin/cachy-screenshot"
+local tui         = "~/.local/bin/cachy-tui"   -- floating system TUIs (wlctl, bluetui, wiremix, pacsea, btop)
 
 ---------------------
 ---- KEYBINDINGS ----
@@ -31,7 +32,13 @@ hl.bind(mod .. " + SHIFT + W", hl.dsp.exec_cmd("~/.local/bin/cachy-theme pick-wa
 hl.bind(mod .. " + comma",  hl.dsp.exec_cmd("hyprmod"))  -- Hyprland settings (HyprMod)
 hl.bind(mod .. " + N",      hl.dsp.exec_cmd("swaync-client -t -sw"))  -- Notification center
 hl.bind(mod .. " + slash",  hl.dsp.exec_cmd("~/.local/bin/cachy-keybinds"))  -- This cheatsheet
-hl.bind("CTRL + SHIFT + Escape", hl.dsp.exec_cmd(terminal .. " -e btop"))  -- Task manager (btop)
+hl.bind("CTRL + SHIFT + Escape", hl.dsp.exec_cmd(tui .. " monitor"))  -- Task manager (btop)
+
+-- System TUIs: Super + Alt + letter. Press again to close.
+hl.bind(mod .. " + ALT + W", hl.dsp.exec_cmd(tui .. " wifi"))       -- Wi-Fi, Ethernet, VPN (wlctl)
+hl.bind(mod .. " + ALT + B", hl.dsp.exec_cmd(tui .. " bluetooth"))  -- Bluetooth (bluetui)
+hl.bind(mod .. " + ALT + A", hl.dsp.exec_cmd(tui .. " audio"))      -- Sound mixer (wiremix)
+hl.bind(mod .. " + ALT + P", hl.dsp.exec_cmd(tui .. " packages"))   -- Packages: install, update, remove (Pacsea)
 
 -- Windows
 hl.bind(mod .. " + Q",             hl.dsp.window.close())  -- Close window

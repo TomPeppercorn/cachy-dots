@@ -17,18 +17,20 @@ libnotify
 xdg-user-dirs
 xdg-utils
 
-# Audio, media keys, power, network, bluetooth
+# Audio, media keys, power, bluetooth
 pipewire
 pipewire-pulse
 wireplumber
-pavucontrol
 playerctl
 brightnessctl
 upower
-network-manager-applet
 bluez
 bluez-utils
-blueman
+
+# System TUIs, opened as floating windows by cachy-tui (Super+Alt+W/B/A/P).
+# Official repos here; wlctl (Wi-Fi) and Pacsea (packages) come from the AUR, see install.sh.
+bluetui
+wiremix
 
 # Look & feel
 ttf-ibmplex-mono-nerd

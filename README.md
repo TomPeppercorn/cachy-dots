@@ -22,11 +22,12 @@ Install CachyOS with only `hyprland` + `kitty` from the Hyprland group (no Nocta
 |---|---|
 | Compositor | Hyprland, **Lua config** (0.55+), snappy ~250 ms animations |
 | Settings app | **HyprMod** (Super+,): change Hyprland settings, binds, curves in a GUI |
-| Bar | **Quickshell**: workspaces, window title, clock, tray, volume, battery, theme + notification buttons |
+| Bar | **Quickshell**: workspaces, window title, clock, tray, network, Bluetooth, volume, battery, theme + notification buttons. Network, Bluetooth and volume open their TUIs |
 | Themes | **cachy-theme**: 8 presets or colors generated from your wallpaper (matugen). One switch recolors everything |
 | Launcher | **Vicinae** or **Walker** (asked at install): apps, indexed file search, clipboard, calculator |
 | Login screen | **SDDM** + astronaut theme; `cachy-login-theme` switches its style or matches your desktop |
 | Terminal | kitty, IBM Plex (BlexMono Nerd Font) |
+| System tools | **Terminal apps in floating windows**: wlctl (Wi-Fi, Ethernet, VPN), bluetui (Bluetooth), wiremix (sound), Pacsea (packages, replaces Shelly), btop. Same toggle keys, same theme |
 | Notifications | swaync (themed) |
 | Lock / idle | hyprlock (Super+L), hypridle (lock 10 min, suspend 30 min) |
 | Browser · chat | Helium (Firefox removed) · Vesktop |
@@ -49,6 +50,20 @@ Install CachyOS with only `hyprland` + `kitty` from the Hyprland group (no Nocta
 Presets: Gruvbox Dark, Catppuccin Mocha, Catppuccin Latte (light), Tokyo Night, Nord, Rosé Pine, Everforest, Kanagawa.
 
 A switch updates the bar, window borders, kitty, GTK apps, notifications, the launcher, the lock screen and btop. Open GTK apps and btop pick it up when reopened.
+
+## System tools
+
+Every system tool is a terminal app that opens as a floating window in the middle of the screen. Press its key again to close it; if it's open behind other windows, the key brings it forward. They use kitty's colors, so they follow your theme.
+
+| Keys | Tool | Also opens from |
+|---|---|---|
+| Super + Alt + W | **wlctl**: Wi-Fi, Ethernet, WireGuard, hotspot (NetworkManager) | Bar network icon, launcher "Wi-Fi" |
+| Super + Alt + B | **bluetui**: pair and connect Bluetooth devices | Bar Bluetooth icon, launcher "Bluetooth" |
+| Super + Alt + A | **wiremix**: volume per app, outputs, inputs (PipeWire) | Click the bar volume, launcher "Sound" |
+| Super + Alt + P | **Pacsea**: search, install, update and remove packages, Arch news, AUR scans | Launcher "Packages" |
+| Ctrl + Shift + Esc | **btop**: processes, CPU, memory, disks | Launcher "Monitor" |
+
+The installer removes the GUI tools these replace (Shelly, pavucontrol, Blueman, the network tray applet) one at a time, and only when the replacement installed. Anything another package still needs is kept. Pass `--keep-gui-tools` to keep them all. `nmtui` and `bluetoothctl` are still there as fallbacks.
 
 ## Keybinds
 
@@ -73,6 +88,8 @@ Super + / shows every bind, including ones you add.
 | Super + T | Toggle split direction |
 | Super + S / Super + Alt + S | Scratchpad / send window there |
 | Super + N | Notification center |
+| Super + Alt + W / B / A / P | Wi-Fi / Bluetooth / sound / packages |
+| Ctrl + Shift + Esc | Task manager (btop) |
 | Print / Super + Shift + S | Screenshot region / region + annotate |
 | Shift + Print / Alt + Print | Screenshot monitor / window |
 | Super + L | Lock |
@@ -91,7 +108,7 @@ Super + / shows every bind, including ones you add.
 ```
 --launcher vicinae|walker     --gpu amd|nvidia|intel|hybrid
 --editor none|codium   --vimrc awesome|basic|none   --theme <preset>|wallpaper
---no-dev  --no-gaming  --no-everyday  --keep-firefox  --no-login-screen
+--no-dev  --no-gaming  --no-everyday  --keep-firefox  --keep-gui-tools  --no-login-screen
 -y, --yes      unattended (also skips paru's PKGBUILD review)
 --dry-run      show actions, change nothing
 ```

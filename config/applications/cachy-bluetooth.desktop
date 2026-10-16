@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Bluetooth
+Comment=Pair and connect Bluetooth devices (bluetui)
+Exec=@HOME@/.local/bin/cachy-tui bluetooth
+Icon=bluetooth
+Keywords=bluetooth;pair;headphones;controller;bluetui;
+Categories=System;Settings;
+Terminal=false

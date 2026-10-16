@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Packages
+Comment=Install, update and remove software (Pacsea)
+Exec=@HOME@/.local/bin/cachy-tui packages
+Icon=pacsea
+Keywords=packages;install;update;software;aur;pacman;store;pacsea;
+Categories=System;PackageManager;
+Terminal=false

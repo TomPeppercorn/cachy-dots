@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Wi-Fi
+Comment=Wi-Fi, Ethernet and VPN (wlctl)
+Exec=@HOME@/.local/bin/cachy-tui wifi
+Icon=network-wireless
+Keywords=wifi;wireless;network;ethernet;vpn;wireguard;internet;wlctl;
+Categories=System;Settings;Network;
+Terminal=false

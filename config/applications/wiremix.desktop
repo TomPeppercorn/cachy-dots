@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Sound
+Comment=Volume, outputs and inputs (wiremix)
+Exec=@HOME@/.local/bin/cachy-tui audio
+Icon=audio-volume-high
+Keywords=sound;audio;volume;mixer;speakers;microphone;pipewire;wiremix;
+Categories=AudioVideo;Audio;Mixer;Settings;
+Terminal=false

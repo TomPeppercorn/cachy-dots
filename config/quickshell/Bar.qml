@@ -1,5 +1,6 @@
 // cachy-dots · top bar
-// Left: workspaces + focused window · Center: clock · Right: tray, volume, battery
+// Left: workspaces + focused window · Center: clock
+// Right: tray, network, Bluetooth, volume, battery, theme, notifications
 
 import Quickshell
 import Quickshell.Hyprland
@@ -177,7 +178,20 @@ PanelWindow {
                 }
             }
 
-            // Volume — scroll to change, middle-click to mute, click for mixer
+            // Network + Bluetooth: separate files, loaded on demand. If one fails to load,
+            // only that icon is missing; the bar itself never breaks.
+            Loader {
+                source: Qt.resolvedUrl("NetIndicator.qml")
+                visible: status === Loader.Ready && !!item && item.visible
+                Layout.alignment: Qt.AlignVCenter
+            }
+            Loader {
+                source: Qt.resolvedUrl("BtIndicator.qml")
+                visible: status === Loader.Ready && !!item && item.visible
+                Layout.alignment: Qt.AlignVCenter
+            }
+
+            // Volume — scroll to change, middle-click to mute, click for the mixer (wiremix)
             Text {
                 id: volume
                 readonly property var sink: Pipewire.defaultAudioSink
@@ -201,7 +215,7 @@ PanelWindow {
                         if (mouse.button === Qt.MiddleButton && volume.ok)
                             volume.sink.audio.muted = !volume.sink.audio.muted;
                         else
-                            Quickshell.execDetached(["pavucontrol"]);
+                            Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/cachy-tui", "audio"]);
                     }
                     onWheel: wheel => {
                         if (!volume.ok) return;

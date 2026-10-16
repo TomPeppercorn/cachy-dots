@@ -30,6 +30,7 @@ WANT_GAMING=1
 WANT_EVERYDAY=1
 GROUPS_FROM_FLAGS=0
 REMOVE_FIREFOX=1
+REMOVE_GUI_TOOLS=1   # Shelly, pavucontrol, Blueman, nm-applet → replaced by TUIs
 SETUP_LOGIN=1
 ASSUME_YES=0
 DRY_RUN=0
@@ -63,6 +64,7 @@ Options:
   --no-gaming       skip CachyOS gaming packages
   --no-everyday     skip Helium / Vesktop / media apps
   --keep-firefox    don't uninstall Firefox
+  --keep-gui-tools  don't remove Shelly / pavucontrol / Blueman / nm-applet (the TUIs replace them)
   --no-login-screen don't set up SDDM even if no login screen is enabled
   -y, --yes         no questions; also passes --noconfirm/--skipreview to paru
   --dry-run         print every action without changing anything
@@ -81,6 +83,7 @@ while (( $# )); do
         --no-gaming)       WANT_GAMING=0; GROUPS_FROM_FLAGS=1 ;;
         --no-everyday)     WANT_EVERYDAY=0; GROUPS_FROM_FLAGS=1 ;;
         --keep-firefox)    REMOVE_FIREFOX=0 ;;
+        --keep-gui-tools)  REMOVE_GUI_TOOLS=0 ;;
         --no-login-screen) SETUP_LOGIN=0 ;;
         -y|--yes)          ASSUME_YES=1 ;;
         --dry-run)         DRY_RUN=1 ;;
@@ -179,6 +182,10 @@ if [[ -t 0 ]] && (( ! ASSUME_YES && ! GROUPS_FROM_FLAGS )); then
     yesno "Install CachyOS gaming packages (Steam, Lutris, Heroic, MangoHud, Proton)?" y && WANT_GAMING=1 || WANT_GAMING=0
     yesno "Install everyday apps (Helium, Vesktop, mpv) and replace Firefox?" y && WANT_EVERYDAY=1 || WANT_EVERYDAY=0
 fi
+if [[ -t 0 ]] && (( ! ASSUME_YES && REMOVE_GUI_TOOLS )); then
+    yesno "Remove the GUI tools the terminal apps replace (Shelly, pavucontrol, Blueman, network applet)?" y \
+        && REMOVE_GUI_TOOLS=1 || REMOVE_GUI_TOOLS=0
+fi
 
 pick LAUNCHER "Launcher?" vicinae \
     vicinae "Vicinae — Raycast-style: apps, indexed file search, clipboard, calculator, emoji, extensions" \
@@ -220,6 +227,7 @@ mapfile -t -O "${#PKGS[@]}" PKGS < <(read_list "$REPO/packages/base.txt")
 (( NEED_LOGIN ))    && PKGS+=(sddm qt6-svg qt6-virtualkeyboard qt6-multimedia-ffmpeg git)
 
 AUR+=(hyprmod)                                   # github.com/BlueManCZ/hyprmod README
+AUR+=(wlctl-bin pacsea-bin)                      # Wi-Fi + package TUIs: wlctl README; Pacsea README + its PKGBUILD-bin
 (( WANT_EVERYDAY )) && AUR+=(helium-browser-bin vesktop)   # AUR pages checked
 case "$LAUNCHER" in
     vicinae) AUR+=(vicinae-bin) ;;              # docs.vicinae.com/install
@@ -248,6 +256,8 @@ printf '  Launcher: %s   GPU: %s   Theme: %s   Editor: neovim%s   Vim: %s\n' "$L
     "$([[ $EDITOR_PICK != none ]] && echo " + $EDITOR_PICK")" "$([[ $VIMRC != none ]] && echo "amix/vimrc ($VIMRC)" || echo unchanged)"
 printf '  Dev: %s   Gaming: %s   Everyday: %s   Remove Firefox: %s\n' \
     "$(yn "$WANT_DEV")" "$(yn "$WANT_GAMING")" "$(yn "$WANT_EVERYDAY")" "$(yn $(( WANT_EVERYDAY && REMOVE_FIREFOX )))"
+printf '  System tools: wlctl (Wi-Fi), bluetui (Bluetooth), wiremix (sound), Pacsea (packages) · remove GUI ones: %s\n' \
+    "$(yn "$REMOVE_GUI_TOOLS")"
 if [[ -n "$EXISTING_DM" ]]; then
     printf '  Login screen: keeping %s\n' "$EXISTING_DM"
 elif (( NEED_LOGIN )); then
@@ -294,6 +304,31 @@ done
 if (( ${#FOUND[@]} )); then
     run paru -S "${PARU_FLAGS[@]}" "${FOUND[@]}"
     ok "AUR packages installed: ${FOUND[*]}"
+fi
+
+# ── GUI tools → TUIs ─────────────────────────────────────────────
+# Each GUI tool is removed only if its replacement actually installed, one at a time,
+# so anything another package still needs is kept instead of failing the whole step.
+if (( REMOVE_GUI_TOOLS )); then
+    step "Replacing GUI system tools with the terminal apps"
+    for pair in "shelly:pacsea" "pavucontrol:wiremix" "blueman:bluetui" "network-manager-applet:wlctl"; do
+        gui="${pair%%:*}"; tui="${pair##*:}"
+        if (( DRY_RUN )); then
+            printf '  %s[dry-run]%s sudo pacman -Rns %s   (only if installed and %s installed)\n' "$c_dim" "$c_0" "$gui" "$tui"
+            continue
+        fi
+        pacman -Q "$gui" >/dev/null 2>&1 || continue
+        if ! command -v "$tui" >/dev/null; then
+            warn "Kept $gui: its replacement ($tui) didn't install"
+            continue
+        fi
+        if out="$(sudo pacman -Rns --noconfirm "$gui" 2>&1)"; then
+            ok "Removed $gui → use $tui"
+        else
+            why="$(printf '%s' "$out" | grep -m1 -iE 'required by' || printf '%s' "$out" | grep -m1 -i 'error' || echo 'pacman refused to remove it')"
+            warn "Kept $gui (${why#:: })"
+        fi
+    done
 fi
 
 # ── Firefox → Helium ─────────────────────────────────────────────
@@ -397,6 +432,19 @@ fi
 for s in "$REPO"/bin/*; do
     [[ -f "$s" ]] || continue
     run install -Dm755 "$s" "$HOME/.local/bin/$(basename "$s")"
+done
+# App-menu entries: open the TUIs as floating windows. wiremix/btop/pacsea entries replace
+# the stock ones (same filename, ~/.local/share wins over /usr/share).
+for d in "$REPO"/config/applications/*.desktop; do
+    [[ -f "$d" ]] || continue
+    dst="$HOME/.local/share/applications/$(basename "$d")"
+    backup_file "$dst"
+    if (( DRY_RUN )); then
+        printf '  %s[dry-run]%s write %s\n' "$c_dim" "$c_0" "$dst"
+    else
+        mkdir -p "$(dirname "$dst")"
+        sed "s|@HOME@|$HOME|g" "$d" > "$dst"
+    fi
 done
 for t in "$REPO"/themes/*.json; do
     [[ -f "$t" ]] || continue

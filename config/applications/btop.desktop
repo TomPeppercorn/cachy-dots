@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Monitor
+Comment=Processes, CPU, memory, disks and network (btop)
+Exec=@HOME@/.local/bin/cachy-tui monitor
+Icon=btop
+Keywords=task;manager;process;cpu;memory;monitor;btop;
+Categories=System;Monitor;
+Terminal=false

@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# cachy-dots · system TUIs in a floating kitty window
+#
+#   cachy-tui wifi        Wi-Fi, Ethernet, VPN   (wlctl)     Super+Alt+W · bar network icon
+#   cachy-tui bluetooth   Bluetooth              (bluetui)   Super+Alt+B · bar Bluetooth icon
+#   cachy-tui audio       Sound mixer            (wiremix)   Super+Alt+A · click the bar volume
+#   cachy-tui packages    Install/update/remove  (pacsea)    Super+Alt+P
+#   cachy-tui monitor     Task manager           (btop)      Ctrl+Shift+Esc
+#
+# Press the same key again: focuses the window if it's open elsewhere, closes it if it's focused.
+# Colors come from kitty, so they follow your theme (Super+Shift+T).
+set -uo pipefail
+
+case "${1:-}" in
+    wifi)      cmd=wlctl;   pkg=wlctl-bin;  title="Wi-Fi" ;;
+    bluetooth) cmd=bluetui; pkg=bluetui;    title="Bluetooth" ;;
+    audio)     cmd=wiremix; pkg=wiremix;    title="Sound" ;;
+    packages)  cmd=pacsea;  pkg=pacsea-bin; title="Packages" ;;
+    monitor)   cmd=btop;    pkg=btop;       title="Monitor" ;;
+    *) echo "usage: cachy-tui wifi|bluetooth|audio|packages|monitor" >&2; exit 1 ;;
+esac
+
+class="cachy-tui-$1"   # window rules in ~/.config/hypr/cachy/rules.lua match on this (and set the size)
+
+if ! command -v "$cmd" >/dev/null; then
+    notify-send -a cachy-tui "$title: '$cmd' isn't installed" "Re-run the cachy-dots installer, or: paru -S $pkg" 2>/dev/null
+    exit 1
+fi
+
+# Toggle: already open? → close it if focused, otherwise jump to it
+addr="$(hyprctl -j clients 2>/dev/null | jq -r --arg c "$class" 'first(.[] | select(.class == $c) | .address) // empty')"
+if [[ -n "$addr" ]]; then
+    active="$(hyprctl -j activewindow 2>/dev/null | jq -r '.address // empty')"
+    if [[ "$addr" == "$active" ]]; then
+        hyprctl dispatch "hl.dsp.window.close({ window = \"address:$addr\" })" >/dev/null
+    else
+        hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null
+    fi
+    exit 0
+fi
+
+exec kitty --class "$class" --title "$title" -e "$cmd"

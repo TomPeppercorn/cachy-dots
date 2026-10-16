@@ -18,8 +18,24 @@ hl.window_rule({
 
 hl.window_rule({
     name  = "float-utility-windows",
-    match = { class = "^(pavucontrol|org.pulseaudio.pavucontrol|blueman-manager|nm-connection-editor|com.gabm.satty)$" },
+    match = { class = "^(com.gabm.satty|org.pulseaudio.pavucontrol|blueman-manager|nm-connection-editor)$" },
     float = true,
+})
+
+-- System TUIs opened by cachy-tui: float in the middle of the screen, like a popup panel
+hl.window_rule({
+    name   = "system-tui",
+    match  = { class = "^cachy-tui-(wifi|bluetooth|audio)$" },
+    float  = true,
+    size   = "monitor_w*0.5 monitor_h*0.6",
+    center = true,
+})
+hl.window_rule({
+    name   = "system-tui-wide",
+    match  = { class = "^cachy-tui-(packages|monitor)$" },
+    float  = true,
+    size   = "monitor_w*0.75 monitor_h*0.8",
+    center = true,
 })
 
 -- Games: let Steam/Proton titles tear for lowest latency (needs allow_tearing above)
