@@ -3,7 +3,7 @@
 # Reads your live bind files, so binds you add in user.lua show up here too.
 # Tip: end a bind line with  -- description  and that's what gets shown.
 set -uo pipefail
-files=("$HOME/.config/hypr/cachy/binds.lua" "$HOME/.config/hypr/user.lua")
+files=("$HOME/.config/hypr/cachy/binds.lua" "$HOME/.config/hypr/cachy/tablet.lua" "$HOME/.config/hypr/user.lua")
 
 list_binds() {
     printf '%-26s  %s\n' "SUPER + 1-0" "Go to workspace"

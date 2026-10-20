@@ -36,7 +36,11 @@ Install CachyOS with only `hyprland` + `kitty` from the Hyprland group (no Nocta
 | Screen recording | **GPU Screen Recorder** with its ShadowPlay-style overlay (Left Alt+Z or Super+Alt+O): record, pause, stream, instant replay. Encodes on the GPU, so it barely touches performance |
 | Wallpapers | A 24-image pack copied to `~/Pictures/Wallpapers` (in folders: `gruvbox/`, `cars/`, and loose ones). Default: `gruvbox/dan-otis-OYFHT4X5isg.jpg`, a foggy forest |
 | GPU | Detected and confirmed at install; NVIDIA desktop vs hybrid laptop handled differently |
+| Laptops | Detected automatically. **Fingerprint unlock** in hyprlock when a reader is found (password still works; no PAM changes). **Charge limit** (80 / 90% / off) on batteries that support it, applied at every boot; change with `cachy-charge-limit` |
+| Tablet mode | **Experimental**, offered on convertibles (or `--tablet`): screen, touchscreen and pen follow the rotation (`cachy-rotate`, iio-sensor-proxy), on-screen keyboard (squeekboard), and rotation-lock + keyboard buttons in the bar |
+| Firmware | fwupd: `fwupdmgr refresh && fwupdmgr update` for BIOS and device firmware from the Linux Vendor Firmware Service |
 | Dev · Gaming | neovim, git, gh, lazygit, docker, node, python + uv, go, CLI tools; optional VSCodium; Vim upgraded with [amix/vimrc](https://github.com/amix/vimrc) (Awesome or Basic, asked at install) · CachyOS gaming meta-packages |
+| Security (opt-in) | Pentesting **tools**, off by default. Core set from Arch's official repos (nmap, wireshark, tcpdump, ettercap, bettercap, sqlmap, hashcat, john, hydra, aircrack-ng, reaver, hcxtools, metasploit, proxychains-ng, socat, netcat, macchanger, masscan). Optionally adds the [BlackArch](https://blackarch.org) repo for the wider Kali-equivalent set (nikto, gobuster, ffuf, wpscan, responder, impacket, netexec…) and lets you pull whole `blackarch-*` groups. Tools only — no payloads or wordlists |
 | Creative | **Blender** (official repos), **FilmCraft** (video editing, color and sound; open-source Premiere Pro alternative), **LightCraft** (photo library and raw development; open-source Lightroom alternative). The two Craft apps come from the AUR `-bin` packages, or the project's checksum-verified release in `~/.local` if those aren't found |
 
 ## Themes
@@ -101,6 +105,7 @@ Super + / shows every bind, including ones you add.
 | Super + L | Lock |
 | Super + Shift + R / M | Reload Hyprland / log out |
 | Ctrl + Alt + Delete | Log out |
+| Super + Alt + T / K | Tablet mode: lock rotation / on-screen keyboard |
 
 ## Make it yours
 
@@ -116,6 +121,8 @@ Super + / shows every bind, including ones you add.
 --launcher vicinae|walker     --gpu amd|nvidia|intel|hybrid
 --editor none|codium   --vimrc awesome|basic|none   --theme <preset>|wallpaper
 --no-dev  --no-gaming  --no-everyday  --no-creative  --keep-firefox  --keep-gui-tools  --no-login-screen
+--charge-limit 80|90|off      --tablet | --no-tablet
+--security | --no-security    --no-blackarch   (security group; BlackArch repo)
 -y, --yes      unattended (also skips paru's PKGBUILD review)
 --dry-run      show actions, change nothing
 ```
@@ -129,6 +136,9 @@ Re-running is safe. Packages use `--needed`, old configs go to `~/.config/cachy-
 - **Hybrid laptops:** the desktop runs on the integrated GPU. Use `prime-run %command%` in Steam launch options for games.
 - **Login wallpaper without a password:** a small root helper (`/usr/local/libexec/cachy-login-wallpaper`) plus a polkit rule let the logged-in user copy an image onto the login screen. The helper only accepts a PNG, JPEG or WebP on stdin (64 MB max) and writes two fixed files in the theme folder, so it can't be pointed at anything else.
 - **Screen recorder overlay:** it catches its own hotkeys by grabbing the keyboards (it adds a "gsr-ui virtual keyboard"), which can clash with key-remapping tools; its settings have "Only grab virtual devices" for that, and the Super+Alt binds keep working. Locked out of the keyboard? Left Ctrl+Shift+Alt+Esc closes it. The project lists two Hyprland quirks: the wallpaper can show instead of a game while the overlay is open, and opening it over a fullscreen game can upset that window. Recording itself is unaffected; use Super+Alt+R in games if it bothers you.
+- **Tablet mode is experimental.** Rotation uses Hyprland's runtime config (`hyprctl eval`) and survives config reloads; if your built-in screen isn't called `eDP-…`, set `CACHY_ROTATE_OUTPUT` in `~/.config/hypr/user.lua` with `hl.env`. `cachy-rotate status` shows what the sensor reports. The on-screen keyboard is squeekboard (made for phones); it also pops up on text fields while it's switched on.
+- **Security group** installs tools only. `hashcat` and `aircrack-ng` run on your real GPU here — the reason to do this on bare metal rather than in a VM. The BlackArch step runs BlackArch's own `strap.sh`, checksum-verified first; if the checksum has rotated, the installer stops and points you at [blackarch.org/downloads.html](https://blackarch.org/downloads.html) rather than running an unverified script. More tools later: `pacman -S <name>`, or whole groups like `pacman -S blackarch-webapp`. Use them only on systems you own or are authorized to test.
+- **Fingerprint:** register a finger with `sudo fprintd-enroll $USER` (the installer offers this). It unlocks hyprlock only; sudo and the login screen still use your password.
 - **Wallpapers in a public repo** are public. Remove any you don't have the rights to share before pushing.
 - Vicinae sends anonymous system info once a day by default; turn it off in its settings (`telemetry`).
 - **FilmCraft / LightCraft from `~/.local`:** that's the fallback when the AUR packages aren't found. It's pinned to the release whose checksums were verified (0.8.0); re-run the installer after updating `STORYTOLD_VER` to move to a newer one. AUR installs update with the rest of the system.

@@ -1,0 +1,11 @@
+# cachy-dots · battery charge limit (value in /etc/cachy-dots/charge-limit; change with: cachy-charge-limit)
+[Unit]
+Description=Battery charge limit (cachy-dots)
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/cachy-charge-limit-apply
+
+[Install]
+WantedBy=multi-user.target

@@ -185,6 +185,13 @@ PanelWindow {
                 }
             }
 
+            // Tablet mode (experimental): rotation lock + on-screen keyboard; hidden unless TABLET=1
+            Loader {
+                source: Qt.resolvedUrl("TabletButtons.qml")
+                visible: status === Loader.Ready && !!item && item.visible
+                Layout.alignment: Qt.AlignVCenter
+            }
+
             // Network + Bluetooth: separate files, loaded on demand. If one fails to load,
             // only that icon is missing; the bar itself never breaks.
             Loader {

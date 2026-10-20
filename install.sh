@@ -32,10 +32,14 @@ WANT_DEV=1
 WANT_GAMING=1
 WANT_EVERYDAY=1
 WANT_CREATIVE=1
+WANT_SECURITY=0  # pentesting tools; opt-in (specialized + heavy), off unless asked
+SEC_BLACKARCH=1  # with the Security group, also add the BlackArch repo; --no-blackarch to skip
 GROUPS_FROM_FLAGS=0
 REMOVE_FIREFOX=1
 REMOVE_GUI_TOOLS=1   # Shelly, pavucontrol, Blueman, nm-applet → replaced by TUIs
 SETUP_LOGIN=1
+TABLET=""        # 1 | 0 — experimental tablet mode; asked on convertibles, or forced with --tablet
+CHARGE_LIMIT=""  # 80 | 90 | off — asked on laptops whose battery supports a charge limit
 ASSUME_YES=0
 DRY_RUN=0
 
@@ -68,9 +72,14 @@ Options:
   --no-gaming       skip CachyOS gaming packages
   --no-everyday     skip Helium / Vesktop / Spotifast / Obsidian / media apps
   --no-creative     skip Blender / FilmCraft / LightCraft
+  --security        install the Security group (pentesting tools); --no-security to force off
+  --no-blackarch    with --security, install only the official-repo tools; don't add BlackArch
   --keep-firefox    don't uninstall Firefox
   --keep-gui-tools  don't remove Shelly / pavucontrol / Blueman / nm-applet (the TUIs replace them)
   --no-login-screen don't set up SDDM even if no login screen is enabled
+  --charge-limit N  laptops: stop charging at N% (80 or 90), or "off" to always charge fully
+  --tablet          experimental tablet mode (auto-rotation, on-screen keyboard) even if
+                    this machine doesn't report itself as a convertible; --no-tablet skips it
   -y, --yes         no questions; also passes --noconfirm/--skipreview to paru
   --dry-run         print every action without changing anything
   -h, --help        this help
@@ -88,9 +97,15 @@ while (( $# )); do
         --no-gaming)       WANT_GAMING=0; GROUPS_FROM_FLAGS=1 ;;
         --no-everyday)     WANT_EVERYDAY=0; GROUPS_FROM_FLAGS=1 ;;
         --no-creative)     WANT_CREATIVE=0; GROUPS_FROM_FLAGS=1 ;;
+        --security)        WANT_SECURITY=1; GROUPS_FROM_FLAGS=1 ;;
+        --no-security)     WANT_SECURITY=0; GROUPS_FROM_FLAGS=1 ;;
+        --no-blackarch)    SEC_BLACKARCH=0 ;;
         --keep-firefox)    REMOVE_FIREFOX=0 ;;
         --keep-gui-tools)  REMOVE_GUI_TOOLS=0 ;;
         --no-login-screen) SETUP_LOGIN=0 ;;
+        --charge-limit)    CHARGE_LIMIT="${2:-}"; shift ;;
+        --tablet)          TABLET=1 ;;
+        --no-tablet)       TABLET=0 ;;
         -y|--yes)          ASSUME_YES=1 ;;
         --dry-run)         DRY_RUN=1 ;;
         -h|--help)         usage; exit 0 ;;
@@ -183,7 +198,21 @@ NEED_LOGIN=0
 MANAGE_LOGIN=$NEED_LOGIN
 (( SETUP_LOGIN )) && [[ "$EXISTING_DM" == sddm && -f /etc/sddm.conf.d/10-cachy-dots.conf ]] && MANAGE_LOGIN=1
 SILENT_VER=v1.5.1                                  # github.com/uiriansan/SilentSDDM release tag
+BLACKARCH_STRAP_SHA1=d338a4bb95d9e09f97508da68ac9e17d963b85f6   # blackarch.org/downloads.html (2026-10-20)
 SILENT_DIR=/usr/share/sddm/themes/silent
+
+# Laptop? Convertible? (SMBIOS chassis type: 30 tablet, 31 convertible, 32 detachable)
+HAS_BATTERY=0
+compgen -G '/sys/class/power_supply/BAT*' >/dev/null && HAS_BATTERY=1
+CHASSIS="$(cat /sys/class/dmi/id/chassis_type 2>/dev/null || echo 0)"
+IS_CONVERTIBLE=0
+[[ "$CHASSIS" =~ ^(30|31|32)$ ]] && IS_CONVERTIBLE=1
+# Charge limit: needs the kernel's charge_control_end_threshold (ThinkPads and many others).
+# Skipped when TLP is installed, because TLP sets these thresholds itself.
+CAN_LIMIT=0
+if compgen -G '/sys/class/power_supply/BAT*/charge_control_end_threshold' >/dev/null && ! pacman -Q tlp >/dev/null 2>&1; then
+    CAN_LIMIT=1
+fi
 
 # ── questions ────────────────────────────────────────────────────
 step "A few picks"
@@ -193,6 +222,28 @@ if [[ -t 0 ]] && (( ! ASSUME_YES && ! GROUPS_FROM_FLAGS )); then
     yesno "Install CachyOS gaming packages (Steam, Lutris, Heroic, MangoHud, Proton)?" y && WANT_GAMING=1 || WANT_GAMING=0
     yesno "Install everyday apps (Helium, Vesktop, Spotifast, Obsidian, mpv) and replace Firefox?" y && WANT_EVERYDAY=1 || WANT_EVERYDAY=0
     yesno "Install creative apps (Blender, FilmCraft video editor, LightCraft photo editor)?" y && WANT_CREATIVE=1 || WANT_CREATIVE=0
+    yesno "Install the Security group (pentesting tools: nmap, wireshark, metasploit, hashcat, aircrack-ng…)?" n \
+        && WANT_SECURITY=1 || WANT_SECURITY=0
+fi
+if [[ -t 0 ]] && (( ! ASSUME_YES && WANT_SECURITY && SEC_BLACKARCH )); then
+    yesno "…and add the BlackArch repo for the wider tool set (nikto, gobuster, wpscan, responder…)?" y \
+        && SEC_BLACKARCH=1 || SEC_BLACKARCH=0
+fi
+if (( CAN_LIMIT )); then
+    pick CHARGE_LIMIT "Battery: stop charging at…  (change later with: cachy-charge-limit 80|90|off)" 80 \
+        80  "80% — best for battery lifespan if it's usually plugged in" \
+        90  "90% — a bit more runtime, still easier on the battery" \
+        off "100% — always charge fully"
+elif [[ -n "$CHARGE_LIMIT" ]]; then
+    warn "--charge-limit ignored: this machine's battery doesn't support a limit (or TLP manages it)"
+    CHARGE_LIMIT=""
+fi
+if [[ -z "$TABLET" ]]; then
+    TABLET=0
+    if (( IS_CONVERTIBLE )) && [[ -t 0 ]] && (( ! ASSUME_YES )); then
+        yesno "Experimental: tablet mode (screen, touch and pen follow the rotation; on-screen keyboard)?" n \
+            && TABLET=1
+    fi
 fi
 if [[ -t 0 ]] && (( ! ASSUME_YES && REMOVE_GUI_TOOLS )); then
     yesno "Remove the GUI tools the terminal apps replace (Shelly, pavucontrol, Blueman, network applet)?" y \
@@ -237,6 +288,7 @@ mapfile -t -O "${#PKGS[@]}" PKGS < <(read_list "$REPO/packages/base.txt")
 (( WANT_GAMING ))   && mapfile -t -O "${#PKGS[@]}" PKGS < <(read_list "$REPO/packages/gaming.txt")
 (( WANT_EVERYDAY )) && mapfile -t -O "${#PKGS[@]}" PKGS < <(read_list "$REPO/packages/everyday.txt")
 (( WANT_CREATIVE )) && mapfile -t -O "${#PKGS[@]}" PKGS < <(read_list "$REPO/packages/creative.txt")
+(( WANT_SECURITY )) && mapfile -t -O "${#PKGS[@]}" PKGS < <(read_list "$REPO/packages/security.txt")
 # SilentSDDM's README dependencies; qt6-imageformats lets the login screen show .webp wallpapers
 (( MANAGE_LOGIN ))  && PKGS+=(sddm qt6-svg qt6-virtualkeyboard qt6-multimedia-ffmpeg qt6-imageformats git)
 
@@ -261,7 +313,9 @@ case "$EDITOR_PICK" in
     codium) AUR+=(vscodium) ;;   # AUR page checked
 esac
 
-[[ "$VIMRC" != none ]] && PKGS+=(vim git)   # vim usually comes with CachyOS's Common packages
+[[ "$VIMRC" != none ]] && PKGS+=(vim git)
+(( HAS_BATTERY ))   && PKGS+=(fprintd)                       # fingerprint unlock, if the laptop has a reader
+(( TABLET ))        && PKGS+=(iio-sensor-proxy squeekboard)  # accelerometer + on-screen keyboard (official repos)   # vim usually comes with CachyOS's Common packages
 
 # de-duplicate, keep order
 mapfile -t PKGS < <(printf '%s\n' "${PKGS[@]}" | awk '!seen[$0]++')
@@ -273,6 +327,8 @@ printf '  Launcher: %s   GPU: %s   Theme: %s   Editor: neovim%s   Vim: %s\n' "$L
 printf '  Dev: %s   Gaming: %s   Everyday: %s   Creative: %s   Remove Firefox: %s\n' \
     "$(yn "$WANT_DEV")" "$(yn "$WANT_GAMING")" "$(yn "$WANT_EVERYDAY")" "$(yn "$WANT_CREATIVE")" \
     "$(yn $(( WANT_EVERYDAY && REMOVE_FIREFOX )))"
+(( WANT_SECURITY )) && printf '  Security: yes (pentesting tools)%s\n' \
+    "$( (( SEC_BLACKARCH )) && echo " + BlackArch repo" || echo "")"
 printf '  System tools: wlctl (Wi-Fi), bluetui (Bluetooth), wiremix (sound), Pacsea (packages) · remove GUI ones: %s\n' \
     "$(yn "$REMOVE_GUI_TOOLS")"
 if (( MANAGE_LOGIN && ! NEED_LOGIN )); then
@@ -283,6 +339,13 @@ elif (( NEED_LOGIN )); then
     printf '  Login screen: none found — will set up SDDM (SilentSDDM theme, shows your wallpaper)\n'
 else
     printf '  Login screen: none, and --no-login-screen given — start Hyprland with start-hyprland\n'
+fi
+if (( HAS_BATTERY )); then
+    printf '  Laptop: fingerprint unlock if a reader is found · charge limit: %s · tablet mode: %s\n' \
+        "$([[ -n $CHARGE_LIMIT && $CHARGE_LIMIT != off ]] && echo "$CHARGE_LIMIT%" || echo "none")" \
+        "$( (( TABLET )) && echo "yes (experimental)" || echo no)"
+elif (( TABLET )); then
+    printf '  Tablet mode: yes (experimental)\n'
 fi
 printf '  %d packages + %d from the AUR · old configs backed up to %s\n' \
     "${#PKGS[@]}" "${#AUR[@]}" "${BACKUP/#$HOME/\~}"
@@ -323,6 +386,71 @@ done
 if (( ${#FOUND[@]} )); then
     run paru -S "${PARU_FLAGS[@]}" "${FOUND[@]}"
     ok "AUR packages installed: ${FOUND[*]}"
+fi
+
+# ── BlackArch (optional, for the Security group) ─────────────────
+# Adds BlackArch's signed pacman repo via their official strap.sh, then installs a curated set
+# of popular tools by name. strap.sh is checksum-verified first; if it doesn't match what this
+# installer knows, we stop rather than run an unverified root script. Every curated name is
+# checked against the synced repo DB and skipped if it isn't there — nothing is guessed.
+if (( WANT_SECURITY && SEC_BLACKARCH )); then
+    step "Security: adding the BlackArch repo"
+    if grep -q '^\[blackarch\]' /etc/pacman.conf 2>/dev/null; then
+        ok "BlackArch repo already present"
+    elif (( DRY_RUN )); then
+        run curl -fsSL -o strap.sh https://blackarch.org/strap.sh
+        run sudo ./strap.sh
+    else
+        tmp="$(mktemp -d)"
+        if curl -fsSL -o "$tmp/strap.sh" https://blackarch.org/strap.sh; then
+            if echo "$BLACKARCH_STRAP_SHA1  $tmp/strap.sh" | sha1sum -c --status; then
+                chmod +x "$tmp/strap.sh"
+                if sudo "$tmp/strap.sh"; then ok "BlackArch repo added"
+                else warn "strap.sh failed; skipping BlackArch. The official-repo tools are still installed."; SEC_BLACKARCH=0; fi
+            else
+                warn "strap.sh checksum didn't match the one cachy-dots pins ($BLACKARCH_STRAP_SHA1)."
+                warn "BlackArch likely updated it. Verify + run it yourself from https://blackarch.org/downloads.html, then re-run this installer."
+                SEC_BLACKARCH=0
+            fi
+        else
+            warn "Couldn't download strap.sh; skipping BlackArch. The official-repo tools are still installed."
+            SEC_BLACKARCH=0
+        fi
+        rm -rf "$tmp"
+    fi
+fi
+
+if (( WANT_SECURITY && SEC_BLACKARCH )); then
+    step "Security: BlackArch tools"
+    run sudo pacman -Sy
+    # Popular tools that aren't in the official repos. Resolved against the synced DB; misses skipped.
+    BA_TOOLS=(nikto gobuster ffuf feroxbuster dirb wpscan whatweb nuclei
+              responder impacket enum4linux netexec
+              theharvester dnsrecon dnsenum sublist3r amass
+              wifite bully pixiewps
+              exploitdb)
+    declare -a BA_FOUND=()
+    for name in "${BA_TOOLS[@]}"; do
+        if (( DRY_RUN )) || pacman -Si "$name" >/dev/null 2>&1; then BA_FOUND+=("$name")
+        else warn "BlackArch tool '$name' not in the repo DB — skipped"; fi
+    done
+    if (( ${#BA_FOUND[@]} )); then
+        run paru -S "${PARU_FLAGS[@]}" "${BA_FOUND[@]}"
+        ok "BlackArch tools installed: ${BA_FOUND[*]}"
+    fi
+    # Optional: whole blackarch-* groups. These are large (tens to hundreds of packages each),
+    # so they're off by default and asked one at a time; -y installs none.
+    if [[ -t 0 ]] && (( ! ASSUME_YES )); then
+        declare -a BA_GROUPS=()
+        for g in scanner recon webapp cracker wireless fuzzer forensic exploitation; do
+            yesno "Install the whole blackarch-$g group? (large — skip unless you want the full set)" n \
+                && BA_GROUPS+=("blackarch-$g")
+        done
+        if (( ${#BA_GROUPS[@]} )); then
+            run paru -S "${PARU_FLAGS[@]}" "${BA_GROUPS[@]}"
+            ok "BlackArch groups installed: ${BA_GROUPS[*]}"
+        fi
+    fi
 fi
 
 # ── GUI tools → TUIs ─────────────────────────────────────────────
@@ -498,13 +626,28 @@ else
     printf '%s\n' "$gpu_lua" > "$CONFIG/hypr/cachy/gpu.lua"
 fi
 
-# Launcher choice (read by cachy-launcher)
+# Tablet mode (experimental): rotation + on-screen keyboard, loaded by hyprland.lua when present
+if (( TABLET )); then
+    run install -Dm644 "$REPO/extras/tablet/tablet.lua" "$CONFIG/hypr/cachy/tablet.lua"
+fi
+
+# Fingerprint reader? (fprintd lists a device path when there's one it can use)
+FINGERPRINT=0
+if (( HAS_BATTERY && ! DRY_RUN )) && command -v fprintd-list >/dev/null; then
+    sudo fprintd-list "$USER" 2>/dev/null | grep -q '/net/reactivated/Fprint/Device/' && FINGERPRINT=1
+fi
+
+# Your choices (read by cachy-launcher, cachy-theme and the bar)
 if (( DRY_RUN )); then
-    printf '  %s[dry-run]%s write %s (LAUNCHER=%s)\n' "$c_dim" "$c_0" "$CD/settings" "$LAUNCHER"
+    printf '  %s[dry-run]%s write %s (LAUNCHER=%s TABLET=%s)\n' "$c_dim" "$c_0" "$CD/settings" "$LAUNCHER" "$TABLET"
 else
     cat > "$CD/settings" <<EOF
 # cachy-dots choices. Switch launcher by changing this (and installing the other one).
 LAUNCHER=$LAUNCHER
+# 1 = hyprlock also unlocks with your fingerprint (set when the installer finds a reader)
+FINGERPRINT=$FINGERPRINT
+# 1 = experimental tablet mode: the bar shows rotation-lock and keyboard buttons
+TABLET=$TABLET
 EOF
 fi
 
@@ -641,6 +784,40 @@ fi
 
 run sudo systemctl enable --now bluetooth.service || warn "Bluetooth service not enabled (no adapter?)"
 
+# Laptop: charge limit (a tiny root service applies it at every boot)
+if [[ -n "$CHARGE_LIMIT" ]]; then
+    run sudo install -Dm755 "$REPO/system/cachy-charge-limit-apply" /usr/local/libexec/cachy-charge-limit-apply
+    run sudo install -Dm644 "$REPO/system/cachy-charge-limit.service" /etc/systemd/system/cachy-charge-limit.service
+    run sudo mkdir -p /etc/cachy-dots
+    if (( DRY_RUN )); then
+        printf '  %s[dry-run]%s write /etc/cachy-dots/charge-limit (%s)\n' "$c_dim" "$c_0" "$CHARGE_LIMIT"
+    else
+        echo "$CHARGE_LIMIT" | sudo tee /etc/cachy-dots/charge-limit >/dev/null
+    fi
+    run sudo systemctl daemon-reload
+    run sudo systemctl enable cachy-charge-limit.service
+    if run sudo systemctl restart cachy-charge-limit.service; then
+        ok "Charge limit: $([[ $CHARGE_LIMIT == off ]] && echo "off (charges to 100%)" || echo "$CHARGE_LIMIT%") — change with: cachy-charge-limit 80|90|off"
+    else
+        warn "Couldn't apply the charge limit now; it's retried at every boot (see: systemctl status cachy-charge-limit)"
+    fi
+fi
+
+# Laptop: fingerprint. hyprlock reads it directly (no PAM changes); your password always works too.
+if (( FINGERPRINT )); then
+    if sudo fprintd-list "$USER" 2>/dev/null | grep -q 'Fingerprints for user'; then
+        ok "Fingerprint unlock on (a finger is already registered)"
+    elif [[ -t 0 ]] && (( ! ASSUME_YES )) && yesno "Register a fingerprint for the lock screen now? (touch the sensor several times)" y; then
+        if sudo fprintd-enroll "$USER"; then
+            ok "Fingerprint registered — Super+L, then touch the sensor to unlock"
+        else
+            warn "Fingerprint not registered. Try again any time: sudo fprintd-enroll $USER"
+        fi
+    else
+        ok "Fingerprint unlock ready — register a finger any time: sudo fprintd-enroll $USER"
+    fi
+fi
+
 if (( WANT_DEV )); then
     run sudo systemctl enable --now docker.service
     if ! id -nG "$USER" 2>/dev/null | grep -qw docker; then
@@ -668,3 +845,10 @@ cat <<EOF
   Your own binds:   ~/.config/hypr/user.lua   (never overwritten)
   Old configs:      ${BACKUP/#$HOME/\~}
 EOF
+if (( WANT_SECURITY )); then
+    ok "Security tools installed. Run them against systems you own or are authorized to test."
+    if (( SEC_BLACKARCH )); then
+        printf '  More tools any time: %spacman -S <name>%s (BlackArch) · groups: %spacman -S blackarch-webapp%s …\n' \
+            "$c_b" "$c_0" "$c_b" "$c_0"
+    fi
+fi

@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# cachy-dots · battery charge limit
+#
+#   cachy-charge-limit          show the current limit
+#   cachy-charge-limit 80       stop charging at 80% (any value 50–100)
+#   cachy-charge-limit off      always charge to 100% (e.g. before a trip)
+#
+# Asks for your password (sudo): the limit is a system setting, applied again at every boot.
+set -uo pipefail
+
+conf=/etc/cachy-dots/charge-limit
+apply=/usr/local/libexec/cachy-charge-limit-apply
+
+show() {
+    local bat
+    for bat in /sys/class/power_supply/BAT*; do
+        [[ -r "$bat/charge_control_end_threshold" ]] || continue
+        echo "$(basename "$bat"): stops charging at $(cat "$bat/charge_control_end_threshold")%  (now $(cat "$bat/capacity" 2>/dev/null)%)"
+    done
+}
+
+case "${1:-}" in
+    "") [[ -f "$conf" ]] && echo "Setting: $(cat "$conf")"; show; exit 0 ;;
+    off|[5-9][0-9]|100) value="$1" ;;
+    *) echo "usage: cachy-charge-limit [50–100|off]" >&2; exit 1 ;;
+esac
+
+[[ -x "$apply" ]] || { echo "The charge limit service isn't installed. Re-run the cachy-dots installer on this laptop." >&2; exit 1; }
+echo "$value" | sudo tee "$conf" >/dev/null && sudo "$apply"

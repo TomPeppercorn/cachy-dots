@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""cachy-dots · screen rotation for tablet mode (EXPERIMENTAL)
+
+  cachy-rotate           follow the accelerometer (Hyprland starts this in tablet mode)
+  cachy-rotate lock      lock / unlock the rotation (toggle)    Super+Alt+T · bar button
+  cachy-rotate status    show the sensor reading, lock and applied rotation
+
+The screen, the touchscreen and the pen are turned together. The orientation comes from
+iio-sensor-proxy: `monitor-sensor` keeps the accelerometer claimed and prints when it changes,
+then the reading is taken from iio-sensor-proxy's AccelerometerOrientation property with gdbus.
+Set CACHY_ROTATE_OUTPUT=eDP-1 (or similar) if the built-in screen isn't found by itself.
+"""
+import fcntl
+import json
+import os
+import re
+import select
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+CACHE = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "cachy-dots"
+STATE = CACHE / "rotation"          # "<output> <transform>", read back by tablet.lua after a reload
+LOCK = CACHE / "rotation-locked"    # exists → don't rotate
+RUNNING = CACHE / "rotate.pid"
+
+# iio-sensor-proxy orientation → Hyprland transform (0 normal, 1 90°, 2 180°, 3 270°)
+TRANSFORMS = {"normal": 0, "left-up": 1, "bottom-up": 2, "right-up": 3}
+PROXY = ["--system", "--dest", "net.hadess.SensorProxy", "--object-path", "/net/hadess/SensorProxy"]
+
+
+def notify(title, body=""):
+    subprocess.run(["notify-send", "-a", "Rotation", title, body], stderr=subprocess.DEVNULL, check=False)
+
+
+def sensor_property(name):
+    """Read one net.hadess.SensorProxy property with gdbus; returns the raw reply text or ''."""
+    try:
+        r = subprocess.run(["gdbus", "call", *PROXY, "--method", "org.freedesktop.DBus.Properties.Get",
+                            "net.hadess.SensorProxy", name], capture_output=True, text=True, timeout=5)
+        return r.stdout.strip() if r.returncode == 0 else ""
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def has_accelerometer():
+    return "true" in sensor_property("HasAccelerometer")          # reply looks like (<true>,)
+
+
+def orientation():
+    m = re.search(r"'(normal|left-up|right-up|bottom-up)'", sensor_property("AccelerometerOrientation"))
+    return m.group(1) if m else None                               # 'undefined' while it settles
+
+
+def builtin_output():
+    if os.environ.get("CACHY_ROTATE_OUTPUT"):
+        return os.environ["CACHY_ROTATE_OUTPUT"]
+    try:
+        mons = json.loads(subprocess.run(["hyprctl", "-j", "monitors"], capture_output=True, text=True,
+                                         timeout=5).stdout or "[]")
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None
+    for m in mons:                                                 # laptop panels are eDP-*
+        if str(m.get("name", "")).startswith("eDP"):
+            return m["name"]
+    return mons[0]["name"] if len(mons) == 1 else None
+
+
+def apply(output, transform):
+    lua = (f"hl.monitor({{ output = '{output}', transform = {transform} }}); "
+           f"hl.config({{ input = {{ touchdevice = {{ transform = {transform} }}, "
+           f"tablet = {{ transform = {transform} }} }} }})")
+    r = subprocess.run(["hyprctl", "eval", lua], capture_output=True, text=True, check=False)
+    if r.returncode != 0 or "error" in r.stdout.lower():
+        print(f"cachy-rotate: hyprctl eval failed: {r.stdout.strip() or r.stderr.strip()}", file=sys.stderr)
+        return False
+    CACHE.mkdir(parents=True, exist_ok=True)
+    STATE.write_text(f"{output} {transform}\n")
+    return True
+
+
+def current_applied():
+    try:
+        out, t = STATE.read_text().split()
+        return out, int(t)
+    except (OSError, ValueError):
+        return None, None
+
+
+def follow_once():
+    """Rotate to the sensor's current orientation unless locked. Returns the transform applied, if any."""
+    if LOCK.exists():
+        return None
+    o = orientation()
+    output = builtin_output()
+    if o is None or output is None:
+        return None
+    t = TRANSFORMS[o]
+    if current_applied() == (output, t):
+        return None
+    return t if apply(output, t) else None
+
+
+def single_instance():
+    CACHE.mkdir(parents=True, exist_ok=True)
+    fh = open(RUNNING, "w")
+    try:
+        fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        sys.exit(0)                     # already following
+    fh.write(str(os.getpid()))
+    fh.flush()
+    return fh
+
+
+def follow():
+    _lock = single_instance()
+    if not has_accelerometer():
+        print("cachy-rotate: no accelerometer reported by iio-sensor-proxy; nothing to do", file=sys.stderr)
+        return
+    follow_once()
+    while True:
+        # stdbuf: monitor-sensor's output is buffered when it isn't a terminal
+        proc = subprocess.Popen(["stdbuf", "-oL", "monitor-sensor"], stdout=subprocess.PIPE,
+                                stderr=subprocess.DEVNULL, bufsize=0)
+        fd = proc.stdout.fileno()
+        try:
+            while True:
+                if not select.select([fd], [], [], 60)[0]:
+                    continue
+                if not os.read(fd, 4096):
+                    break                                  # monitor-sensor exited
+                # Let a burst of readings settle (turning the device fires several), then read once
+                eof = False
+                while select.select([fd], [], [], 0.3)[0]:
+                    if not os.read(fd, 4096):
+                        eof = True
+                        break
+                follow_once()
+                if eof:
+                    break
+        finally:
+            proc.kill()
+            proc.wait()
+        time.sleep(2)                                      # iio-sensor-proxy restarted; reconnect
+
+
+def toggle_lock():
+    CACHE.mkdir(parents=True, exist_ok=True)
+    if LOCK.exists():
+        LOCK.unlink()
+        follow_once()
+        notify("Rotation unlocked", "The screen follows how you hold it")
+    else:
+        LOCK.touch()
+        notify("Rotation locked", "Unlock with Super+Alt+T or the bar button")
+
+
+def status():
+    print(f"accelerometer: {'yes' if has_accelerometer() else 'no'}")
+    print(f"sensor says:   {orientation() or 'unknown'}")
+    print(f"locked:        {'yes' if LOCK.exists() else 'no'}")
+    out, t = current_applied()
+    print(f"applied:       {f'{out} transform {t}' if out else 'nothing yet'}")
+
+
+def main(argv):
+    cmd = argv[0] if argv else "follow"
+    if cmd == "follow":
+        follow()
+    elif cmd == "lock":
+        toggle_lock()
+    elif cmd == "status":
+        status()
+    else:
+        print(__doc__.strip())
+        sys.exit(0 if cmd in ("-h", "--help", "help") else 1)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

@@ -1,0 +1,40 @@
+# Security / pentesting tools — the "Security" group (install.sh asks; off by default).
+# Every name here is verified present in Arch's official 'extra' repo, so these install with
+# pacman like anything else — no third-party repo needed for this core set.
+# The wider Kali-equivalent set (nikto, gobuster, wpscan, responder, …) comes from the
+# BlackArch repo, which the installer can add separately.
+#
+# Tools only. Nothing here is an exploit, payload, or wordlist — just the programs.
+
+# Scanning / discovery
+nmap                 # network + host/service discovery, scripting engine
+masscan              # fast asynchronous TCP port scanner
+
+# Traffic analysis
+wireshark-qt         # protocol analyzer (GUI)
+wireshark-cli        # tshark + command-line capture tools
+tcpdump              # command-line packet capture
+ettercap             # LAN sniffer / interceptor (console)
+bettercap            # network recon + monitoring framework
+
+# Web
+sqlmap               # automatic SQL injection detection/exploitation
+
+# Credentials (password auditing / recovery)
+hashcat              # GPU-accelerated hash recovery — the reason to run on bare metal
+john                 # John the Ripper (jumbo)
+hydra                # network logon auditing
+
+# Wireless (802.11)
+aircrack-ng          # Wi-Fi WEP/WPA-PSK key recovery
+reaver               # WPS brute force
+hcxtools             # capture → hashcat/john format conversion
+
+# Exploitation framework
+metasploit           # exploit development/testing platform
+
+# Plumbing often needed alongside the above
+proxychains-ng       # route a program's TCP through SOCKS/HTTP proxies
+socat                # multipurpose socket relay
+openbsd-netcat       # netcat (OpenBSD variant)
+macchanger           # change a NIC's MAC address

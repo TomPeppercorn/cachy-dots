@@ -9,6 +9,7 @@
 -- │    cachy/*         the defaults                              │
 -- │    cachy/theme     colors, written by cachy-theme            │
 -- │    cachy/gpu       GPU settings, written by the installer    │
+-- │    cachy/tablet    tablet mode, if you picked it             │
 -- │    hyprland-gui    HyprMod's saved changes (Super+,)         │
 -- │    user            YOUR tweaks — never overwritten           │
 -- ╰──────────────────────────────────────────────────────────────╯
@@ -20,6 +21,7 @@ require("cachy/rules")
 require("cachy/autostart")
 pcall(require, "cachy/theme")
 pcall(require, "cachy/gpu")
+pcall(require, "cachy/tablet")   -- only there if you picked tablet mode (experimental)
 
 -- HyprMod managed settings
 require("hyprland-gui")

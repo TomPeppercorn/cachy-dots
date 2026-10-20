@@ -1,0 +1,34 @@
+#!/bin/bash
+# cachy-dots · apply the battery charge limit from /etc/cachy-dots/charge-limit (80, 90 … or "off").
+# Run as root by cachy-charge-limit.service at every boot, and by `cachy-charge-limit` when you change it.
+# Works on laptops whose kernel driver exposes charge_control_end_threshold (ThinkPads and many others).
+set -uo pipefail
+PATH=/usr/bin:/bin
+
+value="$(tr -d '[:space:]' < /etc/cachy-dots/charge-limit 2>/dev/null)"
+case "$value" in
+    off|"")                     end=100; start=0 ;;
+    [5-9][0-9]|100)             end=$value; start=$(( value - 5 )) ;;   # resume charging 5% below
+    *) echo "cachy-charge-limit: unexpected value '$value' (use 50–100 or off)" >&2; exit 1 ;;
+esac
+
+applied=0
+for bat in /sys/class/power_supply/BAT*; do
+    [[ -w "$bat/charge_control_end_threshold" ]] || continue
+    # The firmware refuses a start above the end (or an end below the start), so order the writes
+    if [[ -w "$bat/charge_control_start_threshold" ]]; then
+        cur_start="$(cat "$bat/charge_control_start_threshold" 2>/dev/null || echo 0)"
+        if (( start < cur_start )); then
+            echo "$start" > "$bat/charge_control_start_threshold" 2>/dev/null
+            echo "$end"   > "$bat/charge_control_end_threshold"
+        else
+            echo "$end"   > "$bat/charge_control_end_threshold"
+            echo "$start" > "$bat/charge_control_start_threshold" 2>/dev/null
+        fi
+    else
+        echo "$end" > "$bat/charge_control_end_threshold"
+    fi
+    echo "$(basename "$bat"): charging stops at $end%"
+    applied=1
+done
+(( applied )) || { echo "cachy-charge-limit: no battery with a charge limit found" >&2; exit 1; }

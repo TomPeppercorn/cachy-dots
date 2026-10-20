@@ -64,3 +64,6 @@ gpu-screen-recorder
 # Theme manager (cachy-theme): wallpaper-based colors + its runtime
 matugen
 python
+
+# Firmware updates (BIOS, Thunderbolt, docks…) from the Linux Vendor Firmware Service: fwupdmgr update
+fwupd

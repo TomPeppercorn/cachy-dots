@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# cachy-dots · show / hide the on-screen keyboard (squeekboard) — tablet mode, experimental
+#
+#   cachy-osk          toggle      Super+Alt+K · keyboard button in the bar
+#   cachy-osk show | hide
+#
+# While it's on, squeekboard also pops up by itself when you tap a text field.
+set -uo pipefail
+
+say() { notify-send -a "On-screen keyboard" "$1" "${2:-}" 2>/dev/null; echo "$1${2:+ — $2}"; }
+visible() { busctl --user get-property sm.puri.OSK0 /sm/puri/OSK0 sm.puri.OSK0 Visible 2>/dev/null; }
+set_visible() { busctl --user call sm.puri.OSK0 /sm/puri/OSK0 sm.puri.OSK0 SetVisible b "$1" >/dev/null 2>&1; }
+
+command -v squeekboard >/dev/null || { say "squeekboard isn't installed" "Re-run the installer and pick tablet mode, or: sudo pacman -S squeekboard"; exit 1; }
+
+# Start it if it isn't running (Hyprland normally starts it with tablet mode)
+if ! pgrep -x squeekboard >/dev/null; then
+    setsid -f squeekboard >/dev/null 2>&1
+    for _ in 1 2 3 4 5 6 7 8 9 10; do sleep 0.3; visible >/dev/null && break; done
+fi
+
+case "${1:-toggle}" in
+    show)   want=true ;;
+    hide)   want=false ;;
+    toggle) [[ "$(visible)" == "b true" ]] && want=false || want=true ;;
+    *) echo "usage: cachy-osk [toggle|show|hide]" >&2; exit 1 ;;
+esac
+
+# squeekboard only shows itself when GNOME's "screen keyboard" accessibility setting is on
+gsettings set org.gnome.desktop.a11y.applications screen-keyboard-enabled "$want" 2>/dev/null
+set_visible "$want" || say "Couldn't reach squeekboard" "Is it running? Try: squeekboard &"
