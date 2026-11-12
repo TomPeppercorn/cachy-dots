@@ -46,6 +46,7 @@ hl.config({
 
     input = {
         kb_layout    = "us",
+        repeat_delay = 280,     -- ms before a held key repeats (Hyprland default 600)
         follow_mouse = 1,
         sensitivity  = 0,
         accel_profile = "flat", -- raw mouse input, nicer for games

@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# cachy-dots · power menu — opens when you click the battery in the bar.
+#
+#   cachy-power          show the menu (battery-icon click)
+#
+# Lists the power profiles (power-profiles-daemon; switching needs no password thanks to its
+# polkit rule), the battery charge limit on laptops that support one, and a battery summary.
+set -uo pipefail
+
+LAUNCH="$HOME/.local/bin/cachy-launcher"
+have() { command -v "$1" >/dev/null 2>&1; }
+menu() { "$LAUNCH" dmenu "Power"; }
+
+# Changing the charge limit needs root (sudo prompts), so run it in a floating terminal.
+# The window class matches a rule in cachy/rules.lua so it floats centered like the TUIs.
+term_run() {
+    local cmd="$*"
+    exec kitty --class cachy-tui-power --title "Power" -e sh -c \
+        "$cmd || { printf '\\n%s exited with an error (see above). Press Enter to close.' '$cmd'; read -r _; }"
+}
+
+battery_details() {
+    local bat="${climit_file%%/charge_control_end_threshold*}"; bat="${bat%% *}"
+    [[ -d "$bat" ]] || bat="$(echo /sys/class/power_supply/BAT* | awk '{print $1}')"
+    if have upower; then
+        local dev; dev="$(upower -e 2>/dev/null | grep -m1 battery)"
+        if [[ -n "$dev" ]]; then
+            local info; info="$(upower -i "$dev" 2>/dev/null | awk -F': +' '
+                /state/{s=$2} /percentage/{p=$2} /time to empty/{te=$2} /time to full/{tf=$2}
+                END{ printf "%s · %s", p, s; if(te)printf " · %s left", te; if(tf)printf " · %s to full", tf }')"
+            notify-send -a Power "Battery" "$info" 2>/dev/null
+            return
+        fi
+    fi
+    # Fallback: read sysfs directly
+    local cap status
+    cap="$(cat "$bat/capacity" 2>/dev/null || echo "?")"
+    status="$(cat "$bat/status" 2>/dev/null || echo "?")"
+    notify-send -a Power "Battery" "$cap% · $status" 2>/dev/null
+}
+
+label() { case "$1" in
+    performance) echo "Performance" ;;
+    balanced)    echo "Balanced" ;;
+    power-saver) echo "Power saver" ;;
+    *)           echo "$1" ;;
+esac; }
+
+lines=()
+
+# ── power profiles ────────────────────────────────────────────────
+have_ppd=0
+if have powerprofilesctl; then
+    cur="$(powerprofilesctl get 2>/dev/null || true)"
+    while IFS= read -r p; do
+        [[ -z "$p" ]] && continue
+        have_ppd=1
+        mark=" "; [[ "$p" == "$cur" ]] && mark="●"
+        lines+=("$mark Profile: $(label "$p")")
+    done < <(powerprofilesctl list 2>/dev/null | sed -n 's/^[* ]*\([a-z-]\+\):$/\1/p')
+fi
+
+# ── charge limit (laptops whose battery supports it) ──────────────
+climit_file="$(echo /sys/class/power_supply/BAT*/charge_control_end_threshold)"
+has_limit=0
+if have cachy-charge-limit && [[ -r "${climit_file%% *}" ]]; then
+    has_limit=1
+    now="$(cat "${climit_file%% *}" 2>/dev/null || echo "")"
+    for v in 80 90 100; do
+        mark=" "; [[ "$now" == "$v" ]] && mark="●"
+        [[ "$v" == 100 ]] && lines+=("$mark Charge limit: 100% (full)") || lines+=("$mark Charge limit: ${v}%")
+    done
+fi
+
+lines+=("  Battery details")
+
+[[ ${#lines[@]} -gt 1 || $have_ppd -eq 1 ]] || { notify-send -a Power "No power controls found" "Install power-profiles-daemon for profile switching." 2>/dev/null; exit 0; }
+
+choice="$(printf '%s\n' "${lines[@]}" | menu)"
+[[ -z "$choice" ]] && exit 0
+
+case "$choice" in
+    *"Profile: Performance") powerprofilesctl set performance ;;
+    *"Profile: Balanced")    powerprofilesctl set balanced ;;
+    *"Profile: Power saver") powerprofilesctl set power-saver ;;
+    *"Charge limit: 100% (full)") term_run cachy-charge-limit off ;;
+    *"Charge limit: "*)      term_run cachy-charge-limit "${choice//[^0-9]/}" ;;
+    *"Battery details")      battery_details ;;
+esac

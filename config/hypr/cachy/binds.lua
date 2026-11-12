@@ -11,7 +11,7 @@ local fileManager = "thunar"
 local launcher    = "~/.local/bin/cachy-launcher"
 local discord     = "vesktop"
 local screenshot  = "~/.local/bin/cachy-screenshot"
-local tui         = "~/.local/bin/cachy-tui"   -- floating system TUIs (wlctl, bluetui, wiremix, pacsea, btop)
+local tui         = "~/.local/bin/cachy-tui"   -- floating system TUIs (wlctl, bluetui, wiremix, btop)
 
 ---------------------
 ---- KEYBINDINGS ----
@@ -38,15 +38,25 @@ hl.bind("CTRL + SHIFT + Escape", hl.dsp.exec_cmd(tui .. " monitor"))  -- Task ma
 hl.bind(mod .. " + ALT + W", hl.dsp.exec_cmd(tui .. " wifi"))       -- Wi-Fi, Ethernet, VPN (wlctl)
 hl.bind(mod .. " + ALT + B", hl.dsp.exec_cmd(tui .. " bluetooth"))  -- Bluetooth (bluetui)
 hl.bind(mod .. " + ALT + A", hl.dsp.exec_cmd(tui .. " audio"))      -- Sound mixer (wiremix)
-hl.bind(mod .. " + ALT + P", hl.dsp.exec_cmd(tui .. " packages"))   -- Packages: install, update, remove (Pacsea)
+hl.bind(mod .. " + ALT + P", hl.dsp.exec_cmd("shelly-ui"))   -- Package manager (Shelly)
 
 -- Windows
 hl.bind(mod .. " + Q",             hl.dsp.window.close())  -- Close window
 hl.bind(mod .. " + F",             hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle" }))  -- Fullscreen
 hl.bind(mod .. " + M",             hl.dsp.window.fullscreen({ mode = "maximized",  action = "toggle" }))  -- Maximize
-hl.bind(mod .. " + SHIFT + Space", hl.dsp.window.float({ action = "toggle" }))  -- Toggle floating
+hl.bind(mod .. " + ALT + Space",   hl.dsp.window.float({ action = "toggle" }))  -- Toggle floating
 hl.bind(mod .. " + P",             hl.dsp.window.pseudo())  -- Pseudo-tile
 hl.bind(mod .. " + T",             hl.dsp.layout("togglesplit"))  -- Toggle split direction
+
+-- Resize the active window (in a tiled layout this moves the split between it and its neighbour).
+-- Super + = / −        the vertical divider  → wider / narrower
+-- Super + Shift + = / −  the horizontal divider → taller / shorter
+-- Hold to keep going. (= is the + key; matching ignores Shift, so these never collide.)
+local step = 80
+hl.bind(mod .. " + equal",         hl.dsp.window.resize({ x =  step, y = 0, relative = true }), { repeating = true })  -- Widen
+hl.bind(mod .. " + minus",         hl.dsp.window.resize({ x = -step, y = 0, relative = true }), { repeating = true })  -- Narrow
+hl.bind(mod .. " + SHIFT + equal", hl.dsp.window.resize({ x = 0, y =  step, relative = true }), { repeating = true })  -- Taller
+hl.bind(mod .. " + SHIFT + minus", hl.dsp.window.resize({ x = 0, y = -step, relative = true }), { repeating = true })  -- Shorter
 
 -- Focus: Super + arrows
 hl.bind(mod .. " + left",  hl.dsp.focus({ direction = "left" }))  -- Focus left

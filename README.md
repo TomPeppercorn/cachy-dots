@@ -22,12 +22,15 @@ Install CachyOS with only `hyprland` + `kitty` from the Hyprland group (no Nocta
 |---|---|
 | Compositor | Hyprland, **Lua config** (0.55+), snappy ~250 ms animations |
 | Settings app | **HyprMod** (Super+,): change Hyprland settings, binds, curves in a GUI |
-| Bar | **Quickshell**: workspaces, window title, clock, CPU %, RAM in use, download/upload speed, tray, network, Bluetooth, volume, battery, theme + notification buttons. The readouts open btop; network, Bluetooth and volume open their TUIs |
+| Bar | **Quickshell**: workspaces, window title, clock, CPU %, RAM in use, download/upload speed, tray, network, Bluetooth, volume, battery, theme + notification buttons. The readouts open btop; network, Bluetooth and volume open their TUIs; the battery opens a power menu |
 | Themes | **cachy-theme**: 8 presets or colors generated from your wallpaper (matugen). One switch recolors everything |
 | Launcher | **Vicinae** or **Walker** (asked at install): apps, indexed file search, clipboard, calculator |
 | Login screen | **SDDM** + [SilentSDDM](https://github.com/uiriansan/SilentSDDM), neutral: your wallpaper blurred and dimmed, white text, frosted fields, IBM Plex Sans. It follows your wallpaper automatically, so it never clashes with a theme |
 | Terminal | kitty, IBM Plex (BlexMono Nerd Font) |
-| System tools | **Terminal apps in floating windows**: wlctl (Wi-Fi, Ethernet, VPN), bluetui (Bluetooth), wiremix (sound), Pacsea (packages, replaces Shelly), btop. Same toggle keys, same theme |
+| System tools | **Terminal apps in floating windows**: wlctl (Wi-Fi, Ethernet, VPN), bluetui (Bluetooth), wiremix (sound), btop. Same toggle keys, same theme |
+| Packages | **Shelly** (CachyOS's package manager GUI) on Super+Alt+P |
+| Networking | **Tailscale** mesh VPN (reach your machines from anywhere); run `sudo tailscale up` once to sign in |
+| 3D printing | **Bambu Studio** (the NVIDIA-safe `-nvidia-bin` build is used automatically on NVIDIA) |
 | Notifications | swaync (themed) |
 | Lock / idle | hyprlock (Super+L), hypridle (lock 10 min, suspend 30 min) |
 | Browser · chat · music · notes | Helium (Firefox removed) · Vesktop · [Spotifast](https://github.com/crmne/spotifast) (native Spotify client, needs Premium; follows your theme) · Obsidian |
@@ -36,6 +39,8 @@ Install CachyOS with only `hyprland` + `kitty` from the Hyprland group (no Nocta
 | Screen recording | **GPU Screen Recorder** with its ShadowPlay-style overlay (Left Alt+Z or Super+Alt+O): record, pause, stream, instant replay. Encodes on the GPU, so it barely touches performance |
 | Wallpapers | A 24-image pack copied to `~/Pictures/Wallpapers` (in folders: `gruvbox/`, `cars/`, and loose ones). Default: `gruvbox/dan-otis-OYFHT4X5isg.jpg`, a foggy forest |
 | GPU | Detected and confirmed at install; NVIDIA desktop vs hybrid laptop handled differently |
+| Power | Click the bar **battery** for a menu: power profile (performance / balanced / power-saver, via power-profiles-daemon), charge limit, battery details. Battery shows on laptops only |
+| HiDPI display | Built-in high-res panels (e.g. Framework 13 2256×1504 or 2.8K) get a sensible UI scale (1.5 or 2) pinned in `user.lua` at install — edit or delete it there. External monitors stay on auto |
 | Laptops | Detected automatically. **Fingerprint unlock** in hyprlock when a reader is found (password still works; no PAM changes). **Charge limit** (80 / 90% / off) on batteries that support it, applied at every boot; change with `cachy-charge-limit` |
 | Tablet mode | **Experimental**, offered on convertibles (or `--tablet`): screen, touchscreen and pen follow the rotation (`cachy-rotate`, iio-sensor-proxy), on-screen keyboard (squeekboard), and rotation-lock + keyboard buttons in the bar |
 | Firmware | fwupd: `fwupdmgr refresh && fwupdmgr update` for BIOS and device firmware from the Linux Vendor Firmware Service |
@@ -68,7 +73,7 @@ Every system tool is a terminal app that opens as a floating window in the middl
 | Super + Alt + W | **wlctl**: Wi-Fi, Ethernet, WireGuard, hotspot (NetworkManager). On a machine with no Wi-Fi adapter, opens **nmtui** instead | Bar network icon, launcher "Wi-Fi" |
 | Super + Alt + B | **bluetui**: pair and connect Bluetooth devices | Bar Bluetooth icon, launcher "Bluetooth" |
 | Super + Alt + A | **wiremix**: volume per app, outputs, inputs (PipeWire) | Click the bar volume, launcher "Sound" |
-| Super + Alt + P | **Pacsea**: search, install, update and remove packages, Arch news, AUR scans | Launcher "Packages" |
+| Super + Alt + P | **Shelly**: install, update and remove packages (GUI) | App menu "Shelly" |
 | Ctrl + Shift + Esc | **btop**: processes, CPU, memory, disks | Launcher "Monitor" |
 
 The installer removes the GUI tools these replace (Shelly, pavucontrol, Blueman, the network tray applet) one at a time, and only when the replacement installed. Anything another package still needs is kept. Pass `--keep-gui-tools` to keep them all. `nmtui` and `bluetoothctl` are still there as fallbacks.
@@ -92,7 +97,9 @@ Super + / shows every bind, including ones you add.
 | Super + , | HyprMod (Hyprland settings) |
 | Super + Q | Close window |
 | Super + F / M | Fullscreen / maximize |
-| Super + Shift + Space | Toggle floating |
+| Super + Alt + Space | Toggle floating |
+| Super + = / − | Resize: wider / narrower (moves the vertical split) |
+| Super + Shift + = / − | Resize: taller / shorter (moves the horizontal split) |
 | Super + T | Toggle split direction |
 | Super + S / Super + Alt + S | Scratchpad / send window there |
 | Super + N | Notification center |
@@ -138,6 +145,7 @@ Re-running is safe. Packages use `--needed`, old configs go to `~/.config/cachy-
 - **Screen recorder overlay:** it catches its own hotkeys by grabbing the keyboards (it adds a "gsr-ui virtual keyboard"), which can clash with key-remapping tools; its settings have "Only grab virtual devices" for that, and the Super+Alt binds keep working. Locked out of the keyboard? Left Ctrl+Shift+Alt+Esc closes it. The project lists two Hyprland quirks: the wallpaper can show instead of a game while the overlay is open, and opening it over a fullscreen game can upset that window. Recording itself is unaffected; use Super+Alt+R in games if it bothers you.
 - **Tablet mode is experimental.** Rotation uses Hyprland's runtime config (`hyprctl eval`) and survives config reloads; if your built-in screen isn't called `eDP-…`, set `CACHY_ROTATE_OUTPUT` in `~/.config/hypr/user.lua` with `hl.env`. `cachy-rotate status` shows what the sensor reports. The on-screen keyboard is squeekboard (made for phones); it also pops up on text fields while it's switched on.
 - **Security group** installs tools only. `hashcat` and `aircrack-ng` run on your real GPU here — the reason to do this on bare metal rather than in a VM. The BlackArch step runs BlackArch's own `strap.sh`, checksum-verified first; if the checksum has rotated, the installer stops and points you at [blackarch.org/downloads.html](https://blackarch.org/downloads.html) rather than running an unverified script. More tools later: `pacman -S <name>`, or whole groups like `pacman -S blackarch-webapp`. Use them only on systems you own or are authorized to test.
+- **Framework 13:** pick **Intel** or **AMD** at the GPU prompt (no NVIDIA). Touchscreen models work as plain touch input — it is not a convertible, so tablet mode is correctly not offered. Fingerprint, charge limit and firmware (`fwupdmgr`) are auto-detected; the charge-limit question only appears if the kernel exposes the sysfs control on your board.
 - **Fingerprint:** register a finger with `sudo fprintd-enroll $USER` (the installer offers this). It unlocks hyprlock only; sudo and the login screen still use your password.
 - **Wallpapers in a public repo** are public. Remove any you don't have the rights to share before pushing.
 - Vicinae sends anonymous system info once a day by default; turn it off in its settings (`telemetry`).

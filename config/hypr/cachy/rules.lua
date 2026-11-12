@@ -25,14 +25,14 @@ hl.window_rule({
 -- System TUIs opened by cachy-tui: float in the middle of the screen, like a popup panel
 hl.window_rule({
     name   = "system-tui",
-    match  = { class = "^cachy-tui-(wifi|bluetooth|audio)$" },
+    match  = { class = "^cachy-tui-(wifi|bluetooth|audio|power)$" },
     float  = true,
     size   = "monitor_w*0.5 monitor_h*0.6",
     center = true,
 })
 hl.window_rule({
     name   = "system-tui-wide",
-    match  = { class = "^cachy-tui-(packages|monitor)$" },
+    match  = { class = "^cachy-tui-monitor$" },
     float  = true,
     size   = "monitor_w*0.75 monitor_h*0.8",
     center = true,

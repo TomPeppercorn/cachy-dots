@@ -28,7 +28,7 @@ bluez
 bluez-utils
 
 # System TUIs, opened as floating windows by cachy-tui (Super+Alt+W/B/A/P).
-# Official repos here; wlctl (Wi-Fi) and Pacsea (packages) come from the AUR, see install.sh.
+# Official repos here; wlctl (Wi-Fi) and Shelly (packages) come from install.sh.
 bluetui
 wiremix
 
@@ -61,9 +61,15 @@ satty
 # Screen recording: GPU Screen Recorder (official repos); its overlay, gpu-screen-recorder-ui, is from the AUR
 gpu-screen-recorder
 
+# Power profiles (bar battery menu: performance / balanced / power-saver, via powerprofilesctl)
+power-profiles-daemon
+
 # Theme manager (cachy-theme): wallpaper-based colors + its runtime
 matugen
 python
 
 # Firmware updates (BIOS, Thunderbolt, docks…) from the Linux Vendor Firmware Service: fwupdmgr update
 fwupd
+
+# Mesh VPN (reach your machines anywhere). After install: sudo tailscale up
+tailscale

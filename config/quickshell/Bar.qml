@@ -251,6 +251,13 @@ PanelWindow {
                 color: !charging && pct <= 15 ? Theme.red : charging ? Theme.green : Theme.fg
                 font.family: Theme.font
                 font.pixelSize: Theme.fontSize
+
+                // Click for power settings: profile, charge limit, battery details
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/cachy-power"])
+                }
             }
 
             // Theme picker

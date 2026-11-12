@@ -294,7 +294,10 @@ mapfile -t -O "${#PKGS[@]}" PKGS < <(read_list "$REPO/packages/base.txt")
 
 AUR+=(hyprmod)                                   # github.com/BlueManCZ/hyprmod README
 AUR+=(gpu-screen-recorder-ui)                    # recorder overlay: its README (git.dec05eba.com/gpu-screen-recorder-ui)
-AUR+=(wlctl-bin pacsea-bin)                      # Wi-Fi + package TUIs: wlctl README; Pacsea README + its PKGBUILD-bin
+AUR+=(wlctl-bin)                                 # Wi-Fi TUI: wlctl README
+AUR+=(shelly)                                    # CachyOS package manager (GUI); Super+Alt+P. Seafoam-Labs/Shelly-ALPM
+# Bambu Studio (3D slicer). NVIDIA proprietary driver needs the -nvidia-bin wrapper to render right.
+if [[ "$GPU" == nvidia ]]; then AUR+=(bambustudio-nvidia-bin); else AUR+=(bambustudio-bin); fi
 (( WANT_EVERYDAY )) && AUR+=(helium-browser-bin vesktop)   # AUR pages checked
 (( WANT_EVERYDAY )) && AUR+=(spotifast-bin)               # Spotify client: Spotifast README + its own AUR recipe
 case "$LAUNCHER" in
@@ -329,7 +332,7 @@ printf '  Dev: %s   Gaming: %s   Everyday: %s   Creative: %s   Remove Firefox: %
     "$(yn $(( WANT_EVERYDAY && REMOVE_FIREFOX )))"
 (( WANT_SECURITY )) && printf '  Security: yes (pentesting tools)%s\n' \
     "$( (( SEC_BLACKARCH )) && echo " + BlackArch repo" || echo "")"
-printf '  System tools: wlctl (Wi-Fi), bluetui (Bluetooth), wiremix (sound), Pacsea (packages) · remove GUI ones: %s\n' \
+printf '  System tools: wlctl (Wi-Fi), bluetui (Bluetooth), wiremix (sound), Shelly (packages, Super+Alt+P) · remove GUI ones: %s\n' \
     "$(yn "$REMOVE_GUI_TOOLS")"
 if (( MANAGE_LOGIN && ! NEED_LOGIN )); then
     printf '  Login screen: SDDM from cachy-dots — switching it to the neutral SilentSDDM look\n'
@@ -458,7 +461,7 @@ fi
 # so anything another package still needs is kept instead of failing the whole step.
 if (( REMOVE_GUI_TOOLS )); then
     step "Replacing GUI system tools with the terminal apps"
-    for pair in "shelly:pacsea" "pavucontrol:wiremix" "blueman:bluetui" "network-manager-applet:wlctl"; do
+    for pair in "pavucontrol:wiremix" "blueman:bluetui" "network-manager-applet:wlctl"; do
         gui="${pair%%:*}"; tui="${pair##*:}"
         if (( DRY_RUN )); then
             printf '  %s[dry-run]%s sudo pacman -Rns %s   (only if installed and %s installed)\n' "$c_dim" "$c_0" "$gui" "$tui"
@@ -602,6 +605,47 @@ for keep in user.lua hyprland-gui.lua; do
     fi
 done
 
+# ── HiDPI: pin an explicit scale for a high-res built-in panel ───
+# cachy/env.lua uses scale="auto", which Hyprland rounds oddly on 3:2 / HiDPI laptop panels
+# (e.g. the Framework 13's 2256x1504 or 2.8K). Offer a known-good scale for the built-in screen,
+# written to user.lua so it's yours to edit; external monitors keep auto.
+EDP_OUTPUT=""; EDP_WIDTH=0
+for d in /sys/class/drm/card*-eDP-*; do
+    [[ -r "$d/modes" ]] || continue
+    read -r edp_mode0 < "$d/modes" || continue          # first line = preferred mode, e.g. 2256x1504
+    [[ "$edp_mode0" =~ ^([0-9]+)x([0-9]+) ]] || continue
+    EDP_OUTPUT="${d##*/}"; EDP_OUTPUT="${EDP_OUTPUT#card*-}"   # card1-eDP-1 -> eDP-1
+    EDP_WIDTH="${BASH_REMATCH[1]}"
+    break
+done
+HIDPI_SUGGEST=""
+if   (( EDP_WIDTH >= 2880 )); then HIDPI_SUGGEST=2
+elif (( EDP_WIDTH >= 2200 )); then HIDPI_SUGGEST=1.5
+fi
+HIDPI_SCALE=""
+if [[ -n "$HIDPI_SUGGEST" ]]; then
+    if [[ -t 0 ]] && (( ! ASSUME_YES )); then
+        pick HIDPI_SCALE "Built-in display is ${EDP_WIDTH}px wide (HiDPI) — UI scale?" "$HIDPI_SUGGEST" \
+            "$HIDPI_SUGGEST" "${HIDPI_SUGGEST}x — recommended for this panel" \
+            auto             "let Hyprland pick (the current default)" \
+            1                "1x — native, everything small"
+    else
+        HIDPI_SCALE="$HIDPI_SUGGEST"
+    fi
+fi
+if [[ -n "$HIDPI_SCALE" && "$HIDPI_SCALE" != auto ]]; then
+    USERLUA="$CONFIG/hypr/user.lua"
+    if (( DRY_RUN )); then
+        printf '  %s[dry-run]%s pin %s scale %s in user.lua\n' "$c_dim" "$c_0" "$EDP_OUTPUT" "$HIDPI_SCALE"
+    else
+        [[ -f "$USERLUA" ]] || : > "$USERLUA"
+        sed -i '/cachy-dots HiDPI/d' "$USERLUA"          # replace any prior one, so re-runs don't stack
+        printf 'hl.monitor({ output = "%s", mode = "preferred", position = "auto", scale = %s })  -- cachy-dots HiDPI (edit or delete freely)\n' \
+            "$EDP_OUTPUT" "$HIDPI_SCALE" >> "$USERLUA"
+    fi
+    ok "Built-in display ($EDP_OUTPUT) scaled ${HIDPI_SCALE}x — change it in ~/.config/hypr/user.lua"
+fi
+
 if (( ! WANT_EVERYDAY )); then
     # no Helium: point Super+B at your current default browser instead
     run sed -i 's|local browser     = "helium-browser"|local browser     = "gtk-launch $(xdg-settings get default-web-browser)"|' "$CONFIG/hypr/cachy/binds.lua"
@@ -656,7 +700,7 @@ for s in "$REPO"/bin/*; do
     [[ -f "$s" ]] || continue
     run install -Dm755 "$s" "$HOME/.local/bin/$(basename "$s")"
 done
-# App-menu entries: open the TUIs as floating windows. wiremix/btop/pacsea entries replace
+# App-menu entries: open the TUIs as floating windows. wiremix/btop entries replace
 # the stock ones (same filename, ~/.local/share wins over /usr/share).
 for d in "$REPO"/config/applications/*.desktop; do
     [[ -f "$d" ]] || continue
@@ -783,6 +827,8 @@ if command -v gsettings >/dev/null || (( DRY_RUN )); then
 fi
 
 run sudo systemctl enable --now bluetooth.service || warn "Bluetooth service not enabled (no adapter?)"
+run sudo systemctl enable --now power-profiles-daemon.service || warn "power-profiles-daemon not enabled"
+run sudo systemctl enable --now tailscaled.service || warn "tailscaled not enabled"
 
 # Laptop: charge limit (a tiny root service applies it at every boot)
 if [[ -n "$CHARGE_LIMIT" ]]; then

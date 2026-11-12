@@ -5,8 +5,9 @@
 #                         no Wi-Fi adapter (Ethernet only) → nmtui, NetworkManager's own TUI
 #   cachy-tui bluetooth   Bluetooth              (bluetui)   Super+Alt+B · bar Bluetooth icon
 #   cachy-tui audio       Sound mixer            (wiremix)   Super+Alt+A · click the bar volume
-#   cachy-tui packages    Install/update/remove  (pacsea)    Super+Alt+P
 #   cachy-tui monitor     Task manager           (btop)      Ctrl+Shift+Esc
+#
+# Packages are handled by Shelly's GUI (Super+Alt+P), not here.
 #
 # Press the same key again: focuses the window if it's open elsewhere, closes it if it's focused.
 # Colors come from kitty, so they follow your theme (Super+Shift+T).
@@ -16,9 +17,8 @@ case "${1:-}" in
     wifi)      cmd=wlctl;   pkg=wlctl-bin;  title="Wi-Fi" ;;
     bluetooth) cmd=bluetui; pkg=bluetui;    title="Bluetooth" ;;
     audio)     cmd=wiremix; pkg=wiremix;    title="Sound" ;;
-    packages)  cmd=pacsea;  pkg=pacsea-bin; title="Packages" ;;
     monitor)   cmd=btop;    pkg=btop;       title="Monitor" ;;
-    *) echo "usage: cachy-tui wifi|bluetooth|audio|packages|monitor" >&2; exit 1 ;;
+    *) echo "usage: cachy-tui wifi|bluetooth|audio|monitor" >&2; exit 1 ;;
 esac
 
 class="cachy-tui-$1"   # window rules in ~/.config/hypr/cachy/rules.lua match on this (and set the size)
