@@ -20,12 +20,24 @@ ShellRoot {
     // Theme picker (Super+Shift+T, or the palette icon in the bar)
     ThemePicker {}
 
+    // Power menu (Ctrl+Alt+Delete)
+    PowerMenu {}
+
     // `qs ipc call theme toggle` — used by the Super+Shift+T keybind
     IpcHandler {
         target: "theme"
 
         function toggle(): void {
             Ui.themePickerOpen = !Ui.themePickerOpen;
+        }
+    }
+
+    // `qs ipc call power toggle` — used by the Ctrl+Alt+Delete keybind
+    IpcHandler {
+        target: "power"
+
+        function toggle(): void {
+            Ui.powerMenuOpen = !Ui.powerMenuOpen;
         }
     }
 }

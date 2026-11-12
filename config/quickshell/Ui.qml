@@ -6,4 +6,5 @@ import QtQuick
 
 Singleton {
     property bool themePickerOpen: false
+    property bool powerMenuOpen: false
 }

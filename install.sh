@@ -221,7 +221,7 @@ if [[ -t 0 ]] && (( ! ASSUME_YES && ! GROUPS_FROM_FLAGS )); then
     yesno "Install dev tools (git, docker, neovim, node, python, go…)?" y && WANT_DEV=1 || WANT_DEV=0
     yesno "Install CachyOS gaming packages (Steam, Lutris, Heroic, MangoHud, Proton)?" y && WANT_GAMING=1 || WANT_GAMING=0
     yesno "Install everyday apps (Helium, Vesktop, Spotifast, Obsidian, mpv) and replace Firefox?" y && WANT_EVERYDAY=1 || WANT_EVERYDAY=0
-    yesno "Install creative apps (Blender, FilmCraft video editor, LightCraft photo editor)?" y && WANT_CREATIVE=1 || WANT_CREATIVE=0
+    yesno "Install creative apps (Blender, FilmCraft, LightCraft, Bambu Studio)?" y && WANT_CREATIVE=1 || WANT_CREATIVE=0
     yesno "Install the Security group (pentesting tools: nmap, wireshark, metasploit, hashcat, aircrack-ng…)?" n \
         && WANT_SECURITY=1 || WANT_SECURITY=0
 fi
@@ -296,8 +296,6 @@ AUR+=(hyprmod)                                   # github.com/BlueManCZ/hyprmod 
 AUR+=(gpu-screen-recorder-ui)                    # recorder overlay: its README (git.dec05eba.com/gpu-screen-recorder-ui)
 AUR+=(wlctl-bin)                                 # Wi-Fi TUI: wlctl README
 AUR+=(shelly)                                    # CachyOS package manager (GUI); Super+Alt+P. Seafoam-Labs/Shelly-ALPM
-# Bambu Studio (3D slicer). NVIDIA proprietary driver needs the -nvidia-bin wrapper to render right.
-if [[ "$GPU" == nvidia ]]; then AUR+=(bambustudio-nvidia-bin); else AUR+=(bambustudio-bin); fi
 (( WANT_EVERYDAY )) && AUR+=(helium-browser-bin vesktop)   # AUR pages checked
 (( WANT_EVERYDAY )) && AUR+=(spotifast-bin)               # Spotify client: Spotifast README + its own AUR recipe
 case "$LAUNCHER" in
@@ -540,6 +538,15 @@ if (( WANT_CREATIVE )); then
             install_storytold_tarball "$app" || true
         fi
     done
+    # Bambu Studio (3D slicer) via Flathub — the Flatpak bundles its own runtime + GL drivers,
+    # so it works on any GPU without the AUR -bin's /opt exec issues. flatpak is a base package.
+    step "Creative: Bambu Studio (Flatpak)"
+    run sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+    if run sudo flatpak install -y --noninteractive flathub com.bambulab.BambuStudio; then
+        ok "Bambu Studio installed (flatpak run com.bambulab.BambuStudio)"
+    else
+        warn "Bambu Studio (Flatpak) didn't install — try later: flatpak install flathub com.bambulab.BambuStudio"
+    fi
 fi
 
 # ── Firefox → Helium ─────────────────────────────────────────────
@@ -805,6 +812,26 @@ if (( MANAGE_LOGIN )); then
             sudo /usr/local/libexec/cachy-login-wallpaper < "$login_wall" >/dev/null \
                 || warn "Couldn't put your wallpaper on the login screen; try: cachy-login-theme"
         fi
+        # HiDPI: scale the login UI to match a high-res built-in panel. SilentSDDM's own
+        # [General] scale (base default.conf); the wallpaper helper writes a .user override and
+        # never touches [General], so this persists. Same thresholds as the desktop HiDPI step.
+        login_scale=""
+        for d in /sys/class/drm/card*-eDP-*; do
+            [[ -r "$d/modes" ]] || continue
+            read -r edp_m0 < "$d/modes" || continue
+            [[ "$edp_m0" =~ ^([0-9]+)x ]] || continue
+            if   (( ${BASH_REMATCH[1]} >= 2880 )); then login_scale=2
+            elif (( ${BASH_REMATCH[1]} >= 2200 )); then login_scale=1.5; fi
+            break
+        done
+        if [[ -n "$login_scale" ]]; then
+            if (( DRY_RUN )); then
+                printf '  %s[dry-run]%s set [General] scale = %s in the SilentSDDM config\n' "$c_dim" "$c_0" "$login_scale"
+            else
+                sudo sed -i "/^\[General\]/,/^\[/ s/^scale = .*/scale = $login_scale/" "$SILENT_DIR/configs/default.conf" \
+                    && ok "Login screen scaled ${login_scale}x for the HiDPI panel"
+            fi
+        fi
         ok "Login screen shows your wallpaper and follows it when you change it"
     fi
     # enable only — starting it now would take over the console you're typing in
@@ -829,6 +856,13 @@ fi
 run sudo systemctl enable --now bluetooth.service || warn "Bluetooth service not enabled (no adapter?)"
 run sudo systemctl enable --now power-profiles-daemon.service || warn "power-profiles-daemon not enabled"
 run sudo systemctl enable --now tailscaled.service || warn "tailscaled not enabled"
+
+# Laptop: power button sleeps instead of shutting down (logind defaults to poweroff).
+# Short press = suspend, hold = power off. Delete the drop-in to revert.
+if (( HAS_BATTERY )); then
+    run sudo install -Dm644 "$REPO/system/logind-powerkey.conf" /etc/systemd/logind.conf.d/60-cachy-dots-powerkey.conf \
+        && ok "Power button now suspends (hold to power off) — takes effect after a reboot"
+fi
 
 # Laptop: charge limit (a tiny root service applies it at every boot)
 if [[ -n "$CHARGE_LIMIT" ]]; then

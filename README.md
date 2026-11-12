@@ -22,7 +22,7 @@ Install CachyOS with only `hyprland` + `kitty` from the Hyprland group (no Nocta
 |---|---|
 | Compositor | Hyprland, **Lua config** (0.55+), snappy ~250 ms animations |
 | Settings app | **HyprMod** (Super+,): change Hyprland settings, binds, curves in a GUI |
-| Bar | **Quickshell**: workspaces, window title, clock, CPU %, RAM in use, download/upload speed, tray, network, Bluetooth, volume, battery, theme + notification buttons. The readouts open btop; network, Bluetooth and volume open their TUIs; the battery opens a power menu |
+| Bar | **Quickshell**: workspaces, window title, clock, CPU %, RAM in use, download/upload speed, tray, network, Bluetooth, volume, battery, theme + notification buttons. CPU and RAM open btop; the throughput readout, network icon, Bluetooth and volume open their TUIs; the battery opens a power menu |
 | Themes | **cachy-theme**: 8 presets or colors generated from your wallpaper (matugen). One switch recolors everything |
 | Launcher | **Vicinae** or **Walker** (asked at install): apps, indexed file search, clipboard, calculator |
 | Login screen | **SDDM** + [SilentSDDM](https://github.com/uiriansan/SilentSDDM), neutral: your wallpaper blurred and dimmed, white text, frosted fields, IBM Plex Sans. It follows your wallpaper automatically, so it never clashes with a theme |
@@ -30,23 +30,24 @@ Install CachyOS with only `hyprland` + `kitty` from the Hyprland group (no Nocta
 | System tools | **Terminal apps in floating windows**: wlctl (Wi-Fi, Ethernet, VPN), bluetui (Bluetooth), wiremix (sound), btop. Same toggle keys, same theme |
 | Packages | **Shelly** (CachyOS's package manager GUI) on Super+Alt+P |
 | Networking | **Tailscale** mesh VPN (reach your machines from anywhere); run `sudo tailscale up` once to sign in |
-| 3D printing | **Bambu Studio** (the NVIDIA-safe `-nvidia-bin` build is used automatically on NVIDIA) |
+| Flatpak | **flatpak** + the Flathub remote, set up on every install |
+| Power button (laptops) | A tap **suspends** instead of shutting down (logind defaults to poweroff); hold it to power off. Revert by deleting `/etc/systemd/logind.conf.d/60-cachy-dots-powerkey.conf` |
 | Notifications | swaync (themed) |
 | Lock / idle | hyprlock (Super+L), hypridle (lock 10 min, suspend 30 min) |
 | Browser · chat · music · notes | Helium (Firefox removed) · Vesktop · [Spotifast](https://github.com/crmne/spotifast) (native Spotify client, needs Premium; follows your theme) · Obsidian |
 | Files | Thunar (Super+E), Yazi (Super+Shift+E) |
 | Screenshots | Print = instant, Super+Shift+S = annotate in Satty |
 | Screen recording | **GPU Screen Recorder** with its ShadowPlay-style overlay (Left Alt+Z or Super+Alt+O): record, pause, stream, instant replay. Encodes on the GPU, so it barely touches performance |
-| Wallpapers | A 24-image pack copied to `~/Pictures/Wallpapers` (in folders: `gruvbox/`, `cars/`, and loose ones). Default: `gruvbox/dan-otis-OYFHT4X5isg.jpg`, a foggy forest |
+| Wallpapers | A 31-image pack copied to `~/Pictures/Wallpapers` (in folders: `gruvbox/`, `cars/`, `framework/`, and loose ones). Default: `gruvbox/dan-otis-OYFHT4X5isg.jpg`, a foggy forest |
 | GPU | Detected and confirmed at install; NVIDIA desktop vs hybrid laptop handled differently |
 | Power | Click the bar **battery** for a menu: power profile (performance / balanced / power-saver, via power-profiles-daemon), charge limit, battery details. Battery shows on laptops only |
-| HiDPI display | Built-in high-res panels (e.g. Framework 13 2256×1504 or 2.8K) get a sensible UI scale (1.5 or 2) pinned in `user.lua` at install — edit or delete it there. External monitors stay on auto |
+| HiDPI display | Built-in high-res panels (e.g. Framework 13 2256×1504 or 2.8K) get a sensible UI scale (1.5 or 2) pinned in `user.lua` at install — edit or delete it there. External monitors stay on auto. The SDDM login screen is scaled to match (SilentSDDM `[General] scale`) |
 | Laptops | Detected automatically. **Fingerprint unlock** in hyprlock when a reader is found (password still works; no PAM changes). **Charge limit** (80 / 90% / off) on batteries that support it, applied at every boot; change with `cachy-charge-limit` |
 | Tablet mode | **Experimental**, offered on convertibles (or `--tablet`): screen, touchscreen and pen follow the rotation (`cachy-rotate`, iio-sensor-proxy), on-screen keyboard (squeekboard), and rotation-lock + keyboard buttons in the bar |
 | Firmware | fwupd: `fwupdmgr refresh && fwupdmgr update` for BIOS and device firmware from the Linux Vendor Firmware Service |
 | Dev · Gaming | neovim, git, gh, lazygit, docker, node, python + uv, go, CLI tools; optional VSCodium; Vim upgraded with [amix/vimrc](https://github.com/amix/vimrc) (Awesome or Basic, asked at install) · CachyOS gaming meta-packages |
 | Security (opt-in) | Pentesting **tools**, off by default. Core set from Arch's official repos (nmap, wireshark, tcpdump, ettercap, bettercap, sqlmap, hashcat, john, hydra, aircrack-ng, reaver, hcxtools, metasploit, proxychains-ng, socat, netcat, macchanger, masscan). Optionally adds the [BlackArch](https://blackarch.org) repo for the wider Kali-equivalent set (nikto, gobuster, ffuf, wpscan, responder, impacket, netexec…) and lets you pull whole `blackarch-*` groups. Tools only — no payloads or wordlists |
-| Creative | **Blender** (official repos), **FilmCraft** (video editing, color and sound; open-source Premiere Pro alternative), **LightCraft** (photo library and raw development; open-source Lightroom alternative). The two Craft apps come from the AUR `-bin` packages, or the project's checksum-verified release in `~/.local` if those aren't found |
+| Creative | **Blender** (official repos), **FilmCraft** (video editing, color and sound; open-source Premiere Pro alternative), **LightCraft** (photo library and raw development; open-source Lightroom alternative), **Bambu Studio** (3D slicer, from Flathub — bundles its own runtime and GL drivers, so it works on any GPU). The two Craft apps come from the AUR `-bin` packages, or the project's checksum-verified release in `~/.local` if those aren't found |
 
 ## Themes
 
@@ -111,7 +112,7 @@ Super + / shows every bind, including ones you add.
 | Super + Alt + R / C | Start/stop recording / save a replay clip (Replay on) |
 | Super + L | Lock |
 | Super + Shift + R / M | Reload Hyprland / log out |
-| Ctrl + Alt + Delete | Log out |
+| Ctrl + Alt + Delete | Power menu: lock, log out, suspend, restart, shut down |
 | Super + Alt + T / K | Tablet mode: lock rotation / on-screen keyboard |
 
 ## Make it yours

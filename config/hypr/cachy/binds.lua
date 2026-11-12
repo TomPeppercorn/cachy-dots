@@ -104,7 +104,7 @@ hl.bind(mod .. " + L",           hl.dsp.exec_cmd("loginctl lock-session"))  -- L
 hl.bind(mod .. " + SHIFT + R",   hl.dsp.exec_cmd("hyprctl reload"))  -- Reload Hyprland config
 local logout = "command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"
 hl.bind(mod .. " + SHIFT + M",   hl.dsp.exec_cmd(logout))  -- Log out of Hyprland
-hl.bind("CTRL + ALT + Delete",   hl.dsp.exec_cmd(logout))  -- Log out of Hyprland
+hl.bind("CTRL + ALT + Delete",   hl.dsp.exec_cmd("qs ipc call power toggle"))  -- Power menu: lock, log out, suspend, restart, shut down
 
 -- Media / brightness keys
 hl.bind("XF86AudioRaiseVolume",  hl.dsp.exec_cmd("wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 5%+"), { locked = true, repeating = true })  -- Volume up

@@ -73,3 +73,6 @@ fwupd
 
 # Mesh VPN (reach your machines anywhere). After install: sudo tailscale up
 tailscale
+
+# Flatpak (Flathub apps, e.g. Bambu Studio — installed by install.sh)
+flatpak
